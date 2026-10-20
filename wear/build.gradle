@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.liftlog.wear'
+    compileSdk 34
+
+    defaultConfig {
+        // Same package and signing key as the phone app: required for the watch and phone to sync.
+        applicationId 'com.liftlog.app'
+        minSdk 30
+        targetSdk 34
+        versionCode((System.getenv('BUILD_NUMBER') ?: '1') as int)
+        versionName "1.0.${System.getenv('BUILD_NUMBER') ?: '1'}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../app/liftlog.keystore')
+            storePassword 'liftlog-key'
+            keyAlias 'liftlog'
+            keyPassword 'liftlog-key'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-wearable:18.2.0'
+}

@@ -40,7 +40,20 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        WatchSync.active = this;
+        notifyWatchOps();
+    }
+
+    /** Tell the page that sets logged on the watch are waiting. */
+    void notifyWatchOps() {
+        runOnUiThread(() -> web.evaluateJavascript("window.dispatchEvent(new Event('liftlogops'))", null));
+    }
+
+    @Override
     protected void onPause() {
+        if (WatchSync.active == this) WatchSync.active = null;
         // Let the page save anything still pending before Android may stop the app.
         web.evaluateJavascript("document.dispatchEvent(new Event('visibilitychange'))", null);
         super.onPause();
@@ -67,6 +80,16 @@ public class MainActivity extends Activity {
             if (ms <= 0 || v == null || !v.hasVibrator()) return;
             long[] pattern = { 0, 250, 120, 250 };
             v.vibrate(VibrationEffect.createWaveform(pattern, -1));
+        }
+
+        @JavascriptInterface
+        public String takeWatchOps() {
+            return WatchSync.takeOps(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void syncWatch(String json) {
+            WatchSync.pushState(MainActivity.this, json);
         }
 
         @JavascriptInterface

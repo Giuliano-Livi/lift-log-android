@@ -11,6 +11,18 @@ works fully offline. Logs are stored on the phone.
 
 Every push to `main` builds a new APK automatically (Actions > Build APK).
 
+## Watch app (Wear OS, e.g. Galaxy Watch 7)
+`LiftLog-Watch.apk` logs sets, runs the workout clock and rest timer, and syncs with the phone app
+(same package name and signing key, Wear OS Data Layer).
+
+- Watch to phone: each saved set is queued and applied the next time the phone app is open.
+- Phone to watch: previous sets, rest times and today's sessions are sent whenever the phone app saves.
+
+Install once with ADB over Wi-Fi: on the watch enable Developer options (Settings > About watch >
+Software information > tap Software version 5 times), then turn on ADB debugging and Wireless
+debugging. From a computer with Android platform-tools:
+`adb pair IP:PAIRPORT` (code from the watch), `adb connect IP:PORT`, `adb install LiftLog-Watch.apk`.
+
 ## Phone features
 - Screen stays on while a workout is running.
 - Vibration when rest is over (plus a beep if sound is on).

@@ -34,19 +34,34 @@ jobs:
       - name: Build offline page
         run: python3 tools/build_page.py
 
-      - name: Build release APK
+      - name: Build release APKs
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: gradle --no-daemon assembleRelease
+        run: |
+          set -o pipefail
+          gradle --no-daemon assembleRelease 2>&1 | tee build.log
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk LiftLog.apk
+      - name: Report build errors
+        if: failure()
+        run: |
+          grep -E "error:|^e: |What went wrong|Could not|> " build.log | head -40 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk LiftLog.apk
+          cp wear/build/outputs/apk/release/wear-release.apk LiftLog-Watch.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Lift Log 1.0.${{ github.run_number }}
-          body: Download LiftLog.apk on your Android phone and open it to install or update.
-          files: LiftLog.apk
+          body: |
+            LiftLog.apk: install on your Android phone.
+            LiftLog-Watch.apk: install on your Wear OS watch (see README for steps).
+          files: |
+            LiftLog.apk
+            LiftLog-Watch.apk
           make_latest: true

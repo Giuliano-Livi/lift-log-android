@@ -568,7 +568,8 @@ body.docked { padding-bottom: 230px; }
     } catch (e) { /* storage unavailable */ }
   }
   function saveLocal() { localStorage.setItem(LS, JSON.stringify(state.logs)); }
-  function persist(d) {
+  function persist(d) { return persistRaw(d).then(function (v) { pushWatch(); return v; }); }
+  function persistRaw(d) {
     if (isEmpty(d)) {
       delete state.logs[d.id];
       if (state.kind === 'cloud') return col.doc(d.id).delete();
@@ -659,6 +660,8 @@ body.docked { padding-bottom: 230px; }
       if (!state.dirty && !state.busy && !inputFocused()) reloadDraft();
       setStatus('saved');
       render();
+      applyWatchOps();
+      pushWatch();
     });
   }
 
@@ -669,6 +672,7 @@ body.docked { padding-bottom: 230px; }
   }
   function restFor(id) { var v = state.rest[id]; return typeof v === 'number' && v > 0 ? v : EXMAP[id].rest; }
   function saveRestPrefs() {
+    pushWatch();
     try { localStorage.setItem('liftlog.rest', JSON.stringify(state.rest)); } catch (e) { /* ignore */ }
     clearTimeout(restSaveT);
     restSaveT = setTimeout(function () {
@@ -717,6 +721,73 @@ body.docked { padding-bottom: 230px; }
     } catch (e) { /* ignore */ }
   }
   var NATIVE = window.Android || null;
+  /* watch sync (only inside the Android app, which provides window.Android) */
+  var watchT = null;
+  function watchState() {
+    var today = todayISO(), last = {}, sessions = [];
+    EXLIST.forEach(function (e) {
+      var l = lastFor(e.id, today);
+      if (l) last[e.id] = { date: l.date, sets: l.sets.map(function (x) { return [x.w, x.r]; }) };
+    });
+    Object.keys(state.logs).forEach(function (k) {
+      var d = state.logs[k];
+      if (!d || !PLAN[d.day] || (d.date !== today && !isRunning(d))) return;
+      var en = {};
+      Object.keys(d.entries || {}).forEach(function (ex) {
+        en[ex] = (d.entries[ex] || []).map(function (x) { return [x && x.w != null ? x.w : null, x && x.r != null ? x.r : null]; });
+      });
+      sessions.push({ id: d.id, day: d.day, date: d.date, entries: en, startedAt: d.startedAt || null, endedAt: d.endedAt || null });
+    });
+    return { v: 1, ts: Date.now(), today: today, rest: state.rest, last: last, sessions: sessions };
+  }
+  function pushWatch() {
+    if (!window.Android || !window.Android.syncWatch) return;
+    clearTimeout(watchT);
+    watchT = setTimeout(function () {
+      try { window.Android.syncWatch(JSON.stringify(watchState())); } catch (e) { /* ignore */ }
+    }, 400);
+  }
+  function applyWatchOps() {
+    if (!window.Android || !window.Android.takeWatchOps) return;
+    var ops;
+    try { ops = JSON.parse(window.Android.takeWatchOps() || '[]'); } catch (e) { return; }
+    if (!Array.isArray(ops) || !ops.length) return;
+    flush();
+    var touched = {}, order = [];
+    ops.forEach(function (op) {
+      if (!op || typeof op.sid !== 'string' || !PLAN[op.day] || !/^\d{4}-\d{2}-\d{2}$/.test(op.date || '')) return;
+      if ('s_' + op.date + '_' + op.day !== op.sid) return;
+      var d = touched[op.sid];
+      if (!d) {
+        if (state.draft && state.draft.id === op.sid) d = state.draft;
+        else d = state.logs[op.sid] ? draftFrom(state.logs[op.sid]) : newDraft(op.day, op.date);
+        touched[op.sid] = d; order.push(op.sid);
+      }
+      if (op.t === 'start') {
+        if (!d.startedAt && op.at > 0) d.startedAt = op.at;
+        d.endedAt = null;
+      } else if (op.t === 'set') {
+        var arr = d.entries[op.ex];
+        if (!arr || !(op.i >= 0) || op.i > 30) return;
+        while (arr.length <= op.i) arr.push({ w: '', r: '' });
+        arr[op.i] = { w: op.w > 0 ? String(op.w) : '', r: op.r > 0 ? String(op.r) : '' };
+      } else if (op.t === 'finish') {
+        if (!d.startedAt && op.at > 0) d.startedAt = op.at;
+        d.endedAt = op.at > 0 ? op.at : Date.now();
+      }
+    });
+    order.forEach(function (sid) {
+      var d = touched[sid];
+      if (d === state.draft) { state.dirty = true; return; }
+      var doc = serialize(d);
+      state.busy++;
+      saving = saving.then(function () { return persist(doc); }).then(function () { state.busy--; }, function () { state.busy--; setStatus('error'); });
+    });
+    if (state.dirty) flush();
+    saving.then(function () { setStatus('saved'); render(); });
+  }
+  window.addEventListener('liftlogops', applyWatchOps);
+
   function keepAwake() {
     if (NATIVE) { try { NATIVE.keepAwake(true); } catch (e) { /* ignore */ } return; }
     try {
