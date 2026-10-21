@@ -74,12 +74,23 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         }
     }
 
+    /** A training day of the plan in use on the phone: id, name and colour (index into COLORS). */
+    static final class Day {
+        final String id, label;
+        final int tone;
+
+        Day(String id, String label, int tone) {
+            this.id = id; this.label = label; this.tone = tone;
+        }
+    }
+
+    /** Built-in plan days, used until the phone app has sent the plan you use. */
     static final String[] DAYS = {"push", "pull", "legs", "upper"};
     static final String[] LABELS = {"Push", "Pull", "Legs", "Upper"};
-    // same palette as the phone app: navy surfaces, one colour per training day
-    static final int[] COLORS = {0xFF8B7CF8, 0xFF5B8DEF, 0xFFF5A524, 0xFF42B986};
-    static final int[] COLORS_HI = {0xFFB6AAFF, 0xFF93B4FA, 0xFFFFCD70, 0xFF7FDCB1};
-    static final int[] ON_DAY = {0xFFFFFFFF, 0xFFFFFFFF, 0xFF1E1404, 0xFF05170E};
+    // same palette as the phone app: navy surfaces, one colour per training day (six colours for your own plans)
+    static final int[] COLORS = {0xFF8B7CF8, 0xFF5B8DEF, 0xFFF5A524, 0xFF42B986, 0xFFE8659E, 0xFF22B5C6};
+    static final int[] COLORS_HI = {0xFFB6AAFF, 0xFF93B4FA, 0xFFFFCD70, 0xFF7FDCB1, 0xFFFF9CC8, 0xFF6FDDE9};
+    static final int[] ON_DAY = {0xFFFFFFFF, 0xFFFFFFFF, 0xFF1E1404, 0xFF05170E, 0xFFFFFFFF, 0xFF03181B};
     static final int BG = 0xFF0B0E1A;
     static final int GREY = 0xFF1B2034;
     static final int SURFACE2 = 0xFF262C45;
@@ -168,7 +179,8 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
 
     // current session
     private String sid, date;
-    private int day;
+    private String dayId = DAYS[0], dayLabel = LABELS[0];
+    private int tone;
     private long startedAt, endedAt;
     private List<String> order = new ArrayList<>();
     private Map<String, List<double[]>> entries = new HashMap<>();
@@ -385,7 +397,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         JSONObject best = null;
         for (int i = 0; i < a.length(); i++) {
             JSONObject s = a.optJSONObject(i);
-            if (s == null || dayIndex(s.optString("day")) < 0) continue;
+            if (s == null || s.optString("day").isEmpty()) continue;
             if (s.optLong("startedAt", 0) > 0 && s.optLong("endedAt", 0) == 0) {
                 if (best == null || s.optLong("startedAt", 0) > best.optLong("startedAt", 0)) best = s;
             }
@@ -421,12 +433,12 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
 
     private void adopt(JSONObject ps) {
         sid = ps.optString("id");
-        day = Math.max(0, dayIndex(ps.optString("day")));
+        setDay(findDay(ps.optString("day"), ps.optString("label", null), ps.optInt("tone", -1)));
         date = ps.optString("date");
         startedAt = 0;
         endedAt = 0;
         entries = new HashMap<>();
-        order = defaultOrder(day);
+        order = defaultOrder(dayId);
         hrSum = 0;
         hrCount = 0;
         hrMax = 0;
@@ -438,7 +450,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             if (o == null) o = new JSONObject();
             o.put("t", type);
             o.put("sid", sid);
-            o.put("day", DAYS[day]);
+            o.put("day", dayId);
             o.put("date", date);
             o.put("at", "finish".equals(type) ? endedAt : startedAt);
             if (("finish".equals(type) || "hr".equals(type)) && hrCount > 0) {
@@ -469,7 +481,14 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         try {
             JSONObject o = new JSONObject(s);
             sid = o.getString("sid");
-            day = o.getInt("day");
+            Object d = o.opt("day");
+            if (d instanceof Number) {
+                // saved by an older version: index into the built-in days
+                int i = Math.max(0, Math.min(DAYS.length - 1, ((Number) d).intValue()));
+                setDay(new Day(DAYS[i], LABELS[i], i));
+            } else {
+                setDay(findDay(d == null ? "" : String.valueOf(d), o.optString("dayLabel", null), o.optInt("tone", -1)));
+            }
             date = o.getString("date");
             startedAt = o.optLong("startedAt", 0);
             endedAt = o.optLong("endedAt", 0);
@@ -477,7 +496,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             hrCount = o.optLong("hrCount", 0);
             hrMax = o.optInt("hrMax", 0);
             order = readIds(o.optJSONArray("order"));
-            if (order.isEmpty()) order = defaultOrder(day);
+            if (order.isEmpty()) order = defaultOrder(dayId);
             entries = new HashMap<>();
             JSONObject en = o.optJSONObject("entries");
             if (en != null) {
@@ -499,7 +518,9 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         try {
             JSONObject o = new JSONObject();
             o.put("sid", sid);
-            o.put("day", day);
+            o.put("day", dayId);
+            o.put("dayLabel", dayLabel);
+            o.put("tone", tone);
             o.put("date", date);
             o.put("startedAt", startedAt);
             o.put("endedAt", endedAt);
@@ -558,16 +579,51 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         return sid != null && startedAt > 0 && endedAt == 0;
     }
 
-    private static int dayIndex(String d) {
+    private static int builtinIndex(String d) {
         for (int i = 0; i < DAYS.length; i++) if (DAYS[i].equals(d)) return i;
         return -1;
+    }
+
+    /** Days of the plan in use, as sent by the phone (the built-in plan before the first sync). */
+    private List<Day> days() {
+        List<Day> l = new ArrayList<>();
+        JSONArray a = phone.optJSONArray("days");
+        if (a != null) {
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.optJSONObject(i);
+                if (o == null || o.optString("id").isEmpty()) continue;
+                String id = o.optString("id");
+                l.add(new Day(id, o.optString("label", id), Math.abs(o.optInt("tone", i)) % COLORS.length));
+            }
+        }
+        if (l.isEmpty()) for (int i = 0; i < DAYS.length; i++) l.add(new Day(DAYS[i], LABELS[i], i));
+        return l;
+    }
+
+    /** A day by id, with the best name and colour known for it. */
+    private Day findDay(String id, String label, int tone) {
+        for (Day d : days()) if (d.id.equals(id)) return d;
+        int bi = builtinIndex(id);
+        String l = label != null && !label.isEmpty() ? label : bi >= 0 ? LABELS[bi] : "Workout";
+        int t = tone >= 0 ? tone % COLORS.length : bi >= 0 ? bi : 0;
+        return new Day(id == null || id.isEmpty() ? DAYS[0] : id, l, t);
+    }
+
+    private void setDay(Day d) {
+        dayId = d.id;
+        dayLabel = d.label;
+        tone = d.tone;
+    }
+
+    private boolean hasExercises(Day d) {
+        return !defaultOrder(d.id).isEmpty();
     }
 
     private static String today() {
         return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
     }
 
-    private static int suggestedDay() {
+    private static int weekdayIndex() {
         switch (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
             case Calendar.TUESDAY: return 1;
             case Calendar.WEDNESDAY:
@@ -577,10 +633,39 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         }
     }
 
-    private List<String> defaultOrder(int d) {
+    /**
+     * Today's suggested day, as on the phone: the built-in plan follows the weekday; your own plans
+     * go round in order (the day after the last one you trained, or the same day if that was today).
+     */
+    private Day suggestedDay(List<Day> ds) {
+        if (ds.isEmpty()) return null;
+        int start = 0;
+        if (phone.optBoolean("rot", false)) {
+            JSONObject ld = phone.optJSONObject("lastDay");
+            if (ld != null) {
+                for (int i = 0; i < ds.size(); i++) {
+                    if (ds.get(i).id.equals(ld.optString("id"))) {
+                        start = today().equals(ld.optString("date")) ? i : (i + 1) % ds.size();
+                        break;
+                    }
+                }
+            }
+        } else {
+            String want = DAYS[weekdayIndex()];
+            for (int i = 0; i < ds.size(); i++) if (ds.get(i).id.equals(want)) start = i;
+        }
+        for (int k = 0; k < ds.size(); k++) {
+            Day d = ds.get((start + k) % ds.size());
+            if (hasExercises(d)) return d;
+        }
+        return null;
+    }
+
+    private List<String> defaultOrder(String id) {
         JSONObject plan = phone.optJSONObject("plan");
-        List<String> l = plan != null ? readIds(plan.optJSONArray(DAYS[d])) : new ArrayList<>();
-        if (l.isEmpty()) for (Ex e : PLAN[d]) l.add(e.id);
+        List<String> l = plan != null ? readIds(plan.optJSONArray(id)) : new ArrayList<>();
+        int bi = builtinIndex(id);
+        if (l.isEmpty() && bi >= 0 && (plan == null || !plan.has(id))) for (Ex e : PLAN[bi]) l.add(e.id);
         return l;
     }
 
@@ -597,7 +682,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     }
 
     private Ex[] plan() {
-        if (order.isEmpty()) order = defaultOrder(day);
+        if (order.isEmpty()) order = defaultOrder(dayId);
         Ex[] out = new Ex[order.size()];
         for (int i = 0; i < out.length; i++) out[i] = exDef(order.get(i));
         return out;
@@ -632,7 +717,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     private int firstOpenExercise() {
         Ex[] p = plan();
         for (int i = 0; i < p.length; i++) if (doneCount(p[i]) < p[i].sets) return i;
-        return p.length - 1;
+        return Math.max(0, p.length - 1);
     }
 
     private boolean allDone() {
@@ -697,17 +782,17 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         return null;
     }
 
-    private void startSession(int d) {
+    private void startSession(Day d) {
         String t = today();
-        String newSid = "s_" + t + "_" + DAYS[d];
+        String newSid = "s_" + t + "_" + d.id;
         if (isRunning() && !newSid.equals(sid)) finishSession(false);
         if (!newSid.equals(sid)) {
             sid = newSid;
-            day = d;
+            setDay(d);
             date = t;
             startedAt = 0;
             entries = new HashMap<>();
-            order = defaultOrder(d);
+            order = defaultOrder(d.id);
             hrSum = 0;
             hrCount = 0;
             hrMax = 0;
@@ -729,6 +814,8 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
 
     private void saveSet() {
         Ex[] p = plan();
+        if (p.length == 0) return;
+        if (exIdx >= p.length) exIdx = p.length - 1;
         Ex e = p[exIdx];
         int si = nextSet(e);
         recordText = checkRecord(e, curW, curR, si);
@@ -982,31 +1069,36 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         c.addView(text(running ? "Keep going" : "Ready to train?", 19, WHITE, true), full(4));
         if (running) {
             LinearLayout live = card();
-            live.addView(text(LABELS[day] + " in progress", 13, COLORS_HI[day], true));
+            live.addView(text(dayLabel + " in progress", 13, COLORS_HI[tone], true));
             statusTv = text(clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel(), 22, WHITE, true);
             live.addView(statusTv, full(2));
             c.addView(live, full(10));
-            c.addView(primary("Continue", day, v -> {
+            c.addView(primary("Continue", tone, v -> {
                 screen = "workout";
                 exIdx = firstOpenExercise();
                 editKey = null;
                 render();
             }), full(8));
         }
-        c.addView(text(running ? "Or start another day" : "Pick today's session", 12, MUTED, false), full(12));
-        int sug = suggestedDay();
-        for (int i = 0; i < 4; i++) {
-            final int d = i;
-            if (!running && i == sug) {
-                c.addView(primary(LABELS[i] + "  ·  today", i, v -> startSession(d)), full(8));
+        List<Day> ds = days();
+        Day sug = suggestedDay(ds);
+        String planName = phone.optString("planName", "");
+        c.addView(text(running ? "Or start another day" : planName.isEmpty() ? "Pick today's session" : planName, 12, MUTED, false), full(12));
+        int shown = 0;
+        for (Day d : ds) {
+            if (!hasExercises(d)) continue;
+            shown++;
+            if (!running && sug != null && d.id.equals(sug.id)) {
+                c.addView(primary(d.label + "  ·  today", d.tone, v -> startSession(d)), full(8));
             } else {
-                TextView b = button("●  " + LABELS[i], GREY, WHITE, v -> startSession(d));
-                android.text.SpannableString sp = new android.text.SpannableString("●  " + LABELS[i]);
-                sp.setSpan(new android.text.style.ForegroundColorSpan(COLORS[i]), 0, 1, 0);
+                TextView b = button("●  " + d.label, GREY, WHITE, v -> startSession(d));
+                android.text.SpannableString sp = new android.text.SpannableString("●  " + d.label);
+                sp.setSpan(new android.text.style.ForegroundColorSpan(COLORS[d.tone]), 0, 1, 0);
                 b.setText(sp);
                 c.addView(b, full(8));
             }
         }
+        if (shown == 0) c.addView(text("Your plan has no exercises yet. Add some in Lift Log on your phone.", 12, MUTED, false), full(8));
         long ts = phone.optLong("ts", 0);
         String sync = ts == 0 ? "Open Lift Log on your phone once to sync"
             : "Synced " + new SimpleDateFormat("d MMM HH:mm", Locale.UK).format(new Date(ts));
@@ -1019,6 +1111,15 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
 
     private void showWorkout() {
         Ex[] p = plan();
+        if (p.length == 0) {
+            LinearLayout c = column();
+            c.addView(pill(dayLabel, COLORS_HI[tone]), wrap(0));
+            c.addView(text("No exercises on this day. Add some in Lift Log on your phone.", 13, WHITE, false), full(10));
+            if (isRunning()) c.addView(button("Finish workout", GREY, WHITE, v -> finishSession(true)), full(10));
+            c.addView(button("Home", BG, MUTED, v -> { screen = "home"; render(); }), full(4));
+            show(c);
+            return;
+        }
         if (exIdx < 0) exIdx = 0;
         if (exIdx >= p.length) exIdx = p.length - 1;
         Ex e = p[exIdx];
@@ -1039,7 +1140,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             if (sr != null && sr.length() > 0) curR = sr.optInt(Math.min(si, sr.length() - 1), e.lo);
             else curR = same != null && same[1] > 0 ? (int) same[1] : e.lo;
         }
-        int col = COLORS_HI[day];
+        int col = COLORS_HI[tone];
         LinearLayout c = column();
         statusTv = pill(isRunning() ? clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel() : "Finished", col);
         c.addView(statusTv, wrap(0));
@@ -1064,7 +1165,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         c.addView(stepper(repsTv, "reps",
             () -> setR(curR - 1), () -> setR(curR + 1), () -> setR(curR - 5), () -> setR(curR + 5)), full(6));
 
-        c.addView(primary("Save set", day, v -> saveSet()), full(12));
+        c.addView(primary("Save set", tone, v -> saveSet()), full(12));
         String done = setsText(ss, e.bw);
         if (!done.isEmpty()) c.addView(text("Done: " + done, 12, MUTED, false), full(8));
 
@@ -1112,8 +1213,13 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     }
 
     private void showRest() {
-        int col = COLORS_HI[day];
+        int col = COLORS_HI[tone];
         Ex[] p = plan();
+        if (p.length == 0) {
+            screen = "workout";
+            showWorkout();
+            return;
+        }
         Ex next = p[Math.min(exIdx, p.length - 1)];
         int si = nextSet(next);
         LinearLayout c = column();
@@ -1147,7 +1253,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         rp.leftMargin = dp(4);
         row.addView(button("+15s", GREY, WHITE, v -> { restEnd += 15000; restTotal += 15; }), rp);
         c.addView(row, full(10));
-        c.addView(primary("Skip rest", day, v -> {
+        c.addView(primary("Skip rest", tone, v -> {
             restEnd = 0;
             recordText = null;
             screen = "workout";
@@ -1168,14 +1274,14 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             }
         }
         LinearLayout c = column();
-        c.addView(pill("WORKOUT DONE", COLORS_HI[day]), wrap(0));
+        c.addView(pill("WORKOUT DONE", COLORS_HI[tone]), wrap(0));
         LinearLayout sum = card();
         sum.addView(text(clock(Math.max(0, (endedAt - startedAt) / 1000)), 36, WHITE, true));
-        sum.addView(text(LABELS[day] + " · " + sets + " sets · " + Math.round(vol) + " kg", 12, MUTED, false), full(2));
-        if (hrCount > 0) sum.addView(text("♥ avg " + hrAvg() + " · max " + hrMax + " bpm", 12, COLORS_HI[day], true), full(4));
+        sum.addView(text(dayLabel + " · " + sets + " sets · " + Math.round(vol) + " kg", 12, MUTED, false), full(2));
+        if (hrCount > 0) sum.addView(text("♥ avg " + hrAvg() + " · max " + hrMax + " bpm", 12, COLORS_HI[tone], true), full(4));
         c.addView(sum, full(10));
         c.addView(text("Sent to your phone. It updates next time you open Lift Log there.", 11, MUTED, false), full(10));
-        c.addView(primary("Done", day, v -> {
+        c.addView(primary("Done", tone, v -> {
             screen = "home";
             render();
         }), full(10));

@@ -1,10 +1,11 @@
 """Turn web/lift-log.html (the Claude artifact source) into the app's offline page.
 
-Swaps the Google Fonts link for the bundled font files and adds the document
-skeleton the artifact host normally provides. Run before building:
+Swaps the Google Fonts link for the bundled font files, adds the document
+skeleton the artifact host normally provides, and copies the exercise library
+(web/exlib.js and the drawings in web/ex/) next to it. Run before building:
     python3 tools/build_page.py
 """
-import pathlib, re
+import pathlib, re, shutil
 
 root = pathlib.Path(__file__).resolve().parent.parent
 src = (root / 'web' / 'lift-log.html').read_text(encoding='utf-8')
@@ -28,6 +29,17 @@ reset = (':root{color-scheme:dark;padding-top:env(safe-area-inset-top,0px);paddi
 page = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
         '<style>%s</style></head><body>\n%s\n</body></html>\n' % (reset, body))
-out = root / 'app' / 'src' / 'main' / 'assets' / 'index.html'
+assets = root / 'app' / 'src' / 'main' / 'assets'
+out = assets / 'index.html'
 out.write_text(page, encoding='utf-8')
 print('wrote', out.relative_to(root), len(page), 'bytes')
+
+# exercise library: data script and drawings (Everkinetic, CC BY-SA 4.0, adapted)
+if '<script src="exlib.js"></script>' not in src:
+    raise SystemExit('web/lift-log.html does not load exlib.js')
+shutil.copyfile(root / 'web' / 'exlib.js', assets / 'exlib.js')
+ex_out = assets / 'ex'
+if ex_out.exists():
+    shutil.rmtree(ex_out)
+shutil.copytree(root / 'web' / 'ex', ex_out)
+print('copied exlib.js and', len(list(ex_out.iterdir())), 'drawings')

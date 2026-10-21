@@ -4,3 +4,5 @@ app/build/
 local.properties
 .idea/
 *.iml
+app/src/main/assets/ex/
+app/src/main/assets/exlib.js

@@ -27,10 +27,12 @@
   --f-body: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --navh: 66px;
 }
-.d-push  { --day: #8b7cf8; --day-hi: #b6aaff; --on-day: #ffffff; }
-.d-pull  { --day: #5b8def; --day-hi: #93b4fa; --on-day: #ffffff; }
-.d-legs  { --day: #f5a524; --day-hi: #ffcd70; --on-day: #1e1404; }
-.d-upper { --day: #42b986; --day-hi: #7fdcb1; --on-day: #05170e; }
+.d-push, .tn0  { --day: #8b7cf8; --day-hi: #b6aaff; --on-day: #ffffff; }
+.d-pull, .tn1  { --day: #5b8def; --day-hi: #93b4fa; --on-day: #ffffff; }
+.d-legs, .tn2  { --day: #f5a524; --day-hi: #ffcd70; --on-day: #1e1404; }
+.d-upper, .tn3 { --day: #42b986; --day-hi: #7fdcb1; --on-day: #05170e; }
+.tn4 { --day: #e8659e; --day-hi: #ff9cc8; --on-day: #ffffff; }
+.tn5 { --day: #22b5c6; --day-hi: #6fdde9; --on-day: #03181b; }
 
 * { box-sizing: border-box; }
 body {
@@ -141,14 +143,24 @@ svg { display: block; }
 .k-deload, .t-info { background: color-mix(in srgb, var(--info) 20%, transparent); color: #a8c3ff; }
 .t-warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: #ffcf7a; }
 
-/* log: day + date */
-.days { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+/* log: plan + day + date */
+.planbar {
+  border: 0; width: 100%; text-align: left; background: var(--surface); border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line);
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; min-height: 58px; color: var(--ink);
+}
+.planbar .pt { display: grid; min-width: 0; flex: 1; }
+.planbar .pk { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.planbar .pv { font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planbar .go { flex: none; font-size: 13px; font-weight: 500; color: var(--accent-hi); background: var(--surface2); border-radius: 99px; padding: 7px 14px; }
+.days { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 4px 16px 30px; margin: -4px -16px -30px; scroll-padding-inline: 16px; }
+.days::-webkit-scrollbar { display: none; }
 .daychip {
   border: 0; background: var(--surface); border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line);
   padding: 12px 4px 10px; display: grid; justify-items: center; gap: 4px; min-height: 76px;
+  flex: 1 1 0; min-width: calc((100% - 24px) / 4);
 }
 .daychip .disc { width: 10px; height: 10px; border-radius: 50%; background: var(--day); box-shadow: 0 0 10px var(--day); }
-.daychip .dn { font-weight: 600; font-size: 14px; }
+.daychip .dn { font-weight: 600; font-size: 14px; max-width: 100%; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .daychip .dw { font-size: 11px; color: var(--muted); }
 .daychip[aria-pressed="true"] { background: linear-gradient(150deg, var(--day-hi), var(--day)); color: var(--on-day); box-shadow: 0 10px 24px color-mix(in srgb, var(--day) 35%, transparent); }
 .daychip[aria-pressed="true"] .disc { background: var(--on-day); box-shadow: none; }
@@ -205,6 +217,26 @@ svg { display: block; }
   background: var(--day); color: var(--on-day); box-shadow: 0 0 0 3px var(--surface);
   display: grid; place-items: center; font-weight: 600; font-size: 12px;
 }
+/* exercise drawings: start and end position side by side in one image, shown one at a time */
+.pic .fr { position: absolute; inset: 5px; overflow: hidden; border-radius: 15px; }
+.pic .fr img { display: block; width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 0 0; }
+.pic.draw.sm .fr { inset: 3px; border-radius: 11px; }
+@media (prefers-reduced-motion: no-preference) {
+  .pic.anim .fr img { animation: exflip 2.8s steps(1, end) infinite; }
+}
+@keyframes exflip { 0% { object-position: 0 0; } 50% { object-position: 100% 0; } 100% { object-position: 0 0; } }
+.chead .pic.draw { width: 84px; height: 84px; border-radius: 22px; }
+.howbox { display: grid; gap: 10px; padding: 14px; border-radius: 18px; background: var(--surface2); }
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: st; display: grid; gap: 9px; }
+.steps li { counter-increment: st; display: grid; grid-template-columns: 24px 1fr; gap: 10px; font-size: 13.5px; line-height: 1.45; }
+.steps li::before {
+  content: counter(st); width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--day) 26%, var(--surface3)); color: var(--ink); font-size: 12px; font-weight: 600;
+}
+.tips { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.credit { font-size: 11.5px; color: var(--faint); line-height: 1.5; }
+.credit a { color: var(--muted); }
+a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .chead h3 { font-size: 16.5px; font-weight: 600; line-height: 1.25; text-wrap: balance; }
 .target { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
 .last { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
@@ -249,6 +281,76 @@ svg { display: block; }
 }
 .note label { font-weight: 600; font-size: 15px; }
 .foot { font-size: 12px; color: var(--faint); text-align: center; }
+
+/* plans, plan editor, exercise library */
+.subnav { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; }
+.subnav .back { padding-left: 12px; }
+.plan.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.phead h3 { font-size: 17px; font-weight: 600; line-height: 1.25; }
+.pdays { display: flex; flex-wrap: wrap; gap: 6px; }
+.pday { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; padding: 5px 11px; border-radius: 99px; background: var(--surface2); }
+.pday i { width: 8px; height: 8px; border-radius: 50%; background: var(--day); flex: none; }
+.eday { box-shadow: inset 3px 0 0 var(--day), inset 0 0 0 1px var(--line); }
+.dhead { display: flex; align-items: center; gap: 8px; }
+.tone {
+  width: 34px; height: 34px; border-radius: 12px; border: 0; flex: none;
+  background: linear-gradient(135deg, var(--day-hi), var(--day)); box-shadow: 0 6px 14px color-mix(in srgb, var(--day) 35%, transparent);
+}
+.dlabel, .pname {
+  flex: 1; width: 0; min-width: 0; min-height: 44px; border: 0; border-radius: 14px; background: var(--surface2); color: var(--ink);
+  padding: 8px 12px; font-weight: 600; font-size: 16px; box-shadow: inset 0 0 0 1px var(--line);
+}
+.pname { width: 100%; font-size: 18px; }
+.ib {
+  width: 36px; height: 36px; border-radius: 12px; border: 0; background: var(--surface2); color: var(--ink); flex: none;
+  display: grid; place-items: center; font-size: 15px;
+}
+.ib[disabled] { opacity: .3; cursor: default; }
+.ib.x { color: #ff9aac; }
+.elist { display: grid; gap: 8px; }
+.erow { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; background: var(--surface2); border-radius: 18px; padding: 8px; }
+.erow .pic { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(150deg, color-mix(in srgb, var(--day) 30%, var(--surface3)), var(--surface3)); }
+.erow .nm { border: 0; background: none; padding: 0; text-align: left; font-weight: 600; font-size: 13.5px; line-height: 1.3; color: var(--ink); min-height: 36px; }
+.erow .ebtns { display: flex; gap: 4px; }
+.erow .ebtns .ib { background: var(--surface3); }
+.nums { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12px; color: var(--muted); padding: 2px 2px 0; }
+.nums input, .nums select {
+  min-height: 38px; border: 0; border-radius: 11px; background: var(--surface); color: var(--ink); font-weight: 600; font-size: 15px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.nums input { width: 44px; text-align: center; padding: 0 4px; }
+.nums select { padding: 0 8px; }
+.nums .grp { display: inline-flex; align-items: center; gap: 6px; }
+.libtools { display: grid; gap: 10px; }
+.search {
+  width: 100%; min-height: 48px; border: 0; border-radius: 16px; background: var(--surface); color: var(--ink);
+  padding: 8px 14px; box-shadow: inset 0 0 0 1px var(--line); font-size: 15px;
+}
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 16px; margin: -2px -16px; scroll-padding-inline: 16px; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: none; border: 0; background: var(--surface); border-radius: 99px; min-height: 36px; padding: 6px 14px; font-size: 13px; font-weight: 500; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.chips button[aria-pressed="true"] { background: linear-gradient(135deg, var(--accent-hi), var(--accent)); color: #fff; box-shadow: none; }
+.lib { display: grid; gap: 8px; }
+.lrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; background: var(--surface); border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line); padding: 7px 10px 7px 7px; }
+.lopen { border: 0; background: none; color: var(--ink); padding: 0; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: center; text-align: left; min-height: 56px; }
+.lrow .pic { width: 56px; height: 56px; border-radius: 15px; }
+.lt { display: grid; gap: 2px; min-width: 0; }
+.lt .ln { font-weight: 600; font-size: 14px; line-height: 1.25; }
+.lt .lm { font-size: 12px; color: var(--muted); }
+.lrow .yours { font-size: 10.5px; font-weight: 600; color: var(--accent-hi); letter-spacing: .04em; text-transform: uppercase; }
+.exhero { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.exhero figure {
+  margin: 0; position: relative; aspect-ratio: 1; border-radius: 22px; overflow: hidden;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--day) 28%, var(--surface2)), var(--surface));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.exhero figure img { position: absolute; top: 6%; left: 6%; width: 88%; height: 88%; max-width: none; object-fit: cover; object-position: 0 0; }
+.exhero figure.end img { object-position: 100% 0; }
+.exhero figcaption { position: absolute; left: 12px; top: 10px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.exhero.one { grid-template-columns: 1fr; justify-items: center; }
+.exhero.one .pic { width: 160px; height: 160px; border-radius: 30px; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* banner */
 .banner { padding: 18px; display: grid; gap: 10px; }
@@ -447,6 +549,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   </div>
 </div>
 
+<script src="exlib.js"></script>
 <script>
 (function () {
   'use strict';
@@ -476,7 +579,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
 
   /* ---------- exercise catalogue ---------- */
   var MUSCLES = [['chest', 'Chest'], ['back', 'Back'], ['shoulders', 'Front delts'], ['sidedelt', 'Side delts'], ['reardelt', 'Rear delts'],
-    ['triceps', 'Triceps'], ['biceps', 'Biceps'], ['quads', 'Quads'], ['hams', 'Hamstrings'], ['calves', 'Calves'], ['abs', 'Abs']];
+    ['triceps', 'Triceps'], ['biceps', 'Biceps'], ['quads', 'Quads'], ['hams', 'Hamstrings'], ['glutes', 'Glutes'], ['calves', 'Calves'], ['abs', 'Abs']];
   var CAT = {};
   /* id, name, pictogram, muscles worked (space separated), weight step in kg, bodyweight exercise */
   function C(id, name, pic, muscles, inc, bw) { CAT[id] = { id: id, name: name, pic: pic, muscles: muscles.split(' '), inc: inc, bw: !!bw }; }
@@ -595,21 +698,132 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       S('hanging-leg', 3, 10, 15, 60, 'captain-chair reverse-crunch')
     ] }
   };
-  var DAYS = ['push', 'pull', 'legs', 'upper'];
+  /* ---------- exercise library: this app's catalogue + Everkinetic drawings and instructions (exlib.js) ---------- */
+  var EXL = window.EXLIB || { items: [], map: {} };
+  var EKBY = {};
+  (EXL.items || []).forEach(function (it) { EKBY[it.k] = it; });
+  function guessEq(c) {
+    var n = c.name;
+    if (/smith/i.test(n)) return ['smith'];
+    if (/barbell|ez-bar|t-bar/i.test(n)) return ['barbell'];
+    if (/dumbbell/i.test(n)) return ['dumbbell'];
+    if (/cable|rope|face pull|pulldown|pushdown|crossover|kickback/i.test(n)) return ['cable'];
+    if (c.bw) return ['bodyweight'];
+    return ['machine'];
+  }
+  var PIC_BY_MUSCLE = { chest: 'incline', back: 'row', shoulders: 'ohpress', sidedelt: 'lateral', reardelt: 'prone', biceps: 'curl',
+    triceps: 'pushdown', quads: 'squat', hams: 'legcurl', glutes: 'hinge', calves: 'standcalf', abs: 'crunch' };
+  Object.keys(CAT).forEach(function (id) {
+    var c = CAT[id], k = EXL.map && EXL.map[id], it = k && EKBY[k];
+    c.ours = true;
+    c.type = /^(incline|seatpress|ohpress|pullup|pulldown|row|squat|hinge|dip)$/.test(c.pic) ? 'compound' : 'isolation';
+    c.eq = guessEq(c);
+    if (it) { c.ek = k; c.steps = it.st; c.tips = it.tips; if (it.img) c.img = 'ex/' + k + '.webp'; }
+  });
+  (EXL.items || []).forEach(function (it) {
+    if (it.used) return;
+    var id = 'ek-' + it.k, m = it.m && it.m.length ? it.m : ['other'];
+    CAT[id] = { id: id, name: it.n, pic: PIC_BY_MUSCLE[m[0]] || 'curl', muscles: m, inc: it.inc, bw: !!it.bw, eq: it.eq, type: it.t,
+      ek: it.k, img: it.img ? 'ex/' + it.k + '.webp' : null, steps: it.st, tips: it.tips };
+  });
+  var LIB_IDS = Object.keys(CAT).sort(function (a, b) { return CAT[a].name.localeCompare(CAT[b].name); });
+  function defaultsFor(c) {
+    var m = (c && c.muscles) || [];
+    if (m.indexOf('abs') >= 0 || m.indexOf('calves') >= 0) return { sets: 3, lo: 12, hi: 20, rest: 60 };
+    if (c && c.type === 'compound') return { sets: 3, lo: 6, hi: 10, rest: 150 };
+    return { sets: 3, lo: 10, hi: 15, rest: 75 };
+  }
+
+  /* ---------- plans: the built-in plan above plus your own (stored in settings.plans) ---------- */
+  var BUILTIN_ID = 'ppl4';
+  var BUILTIN_DAYS = ['push', 'pull', 'legs', 'upper'];
+  BUILTIN_DAYS.forEach(function (d, i) { PLAN[d].tone = i; PLAN[d].plan = BUILTIN_ID; });
+  var DAYS = BUILTIN_DAYS.slice();
+  var TONES = 6;
+  function dc(day) { return 'tn' + (((PLAN[day] && PLAN[day].tone) || 0) % TONES); }
   function exFor(day, slot, id) {
-    var c = CAT[id] || CAT[slot.id];
-    return { id: id, name: c.name, pic: c.pic, muscles: c.muscles, inc: c.inc, bw: c.bw, day: day, slot: slot.id,
+    var c = CAT[id] || CAT[slot.id] || { name: id, pic: null, muscles: [], inc: 2.5, bw: false };
+    return { id: id, name: c.name, pic: c.pic, img: c.img, muscles: c.muscles, inc: c.inc, bw: c.bw, day: day, slot: slot.id,
       sets: slot.sets, lo: slot.lo, hi: slot.hi, rest: slot.rest, alt: id !== slot.id };
   }
   var EXMAP = {};
-  DAYS.forEach(function (d) {
-    PLAN[d].slots.forEach(function (s) {
-      [s.id].concat(s.alts).forEach(function (id) { if (!EXMAP[id]) EXMAP[id] = exFor(d, s, id); });
+  function rebuildExmap() {
+    EXMAP = {};
+    DAYS.concat(Object.keys(PLAN).filter(function (d) { return DAYS.indexOf(d) < 0; })).forEach(function (d) {
+      PLAN[d].slots.forEach(function (s) {
+        [s.id].concat(s.alts).forEach(function (id) { if (!EXMAP[id] && CAT[id]) EXMAP[id] = exFor(d, s, id); });
+      });
     });
-  });
-  function exName(id) { return EXMAP[id] ? EXMAP[id].name : id; }
-  function slotById(day, id) { return PLAN[day].slots.filter(function (s) { return s.id === id; })[0] || null; }
-  function slotOf(day, id) { return PLAN[day].slots.filter(function (s) { return s.id === id || s.alts.indexOf(id) >= 0; })[0] || null; }
+  }
+  rebuildExmap();
+  function exInfo(id) {
+    if (EXMAP[id]) return EXMAP[id];
+    if (!CAT[id]) return null;
+    var f = defaultsFor(CAT[id]);
+    return exFor(DAYS[0], { id: id, sets: f.sets, lo: f.lo, hi: f.hi, rest: f.rest, alts: [] }, id);
+  }
+  function exName(id) { var e = EXMAP[id] || CAT[id]; return e ? e.name : id; }
+  function uid(prefix) { return prefix + Date.now().toString(36).slice(-6) + Math.random().toString(36).slice(2, 6); }
+  function builtinPlan() {
+    return { id: BUILTIN_ID, name: 'Push · Pull · Legs · Upper', builtin: true,
+      days: BUILTIN_DAYS.map(function (d) { return { id: d, label: PLAN[d].label, tone: PLAN[d].tone, slots: PLAN[d].slots }; }) };
+  }
+  function customPlans() {
+    var ps = (state && state.settings && state.settings.plans) || {};
+    return Object.keys(ps).map(function (k) { return ps[k]; }).filter(function (p) { return p && !p.archived && Array.isArray(p.days); })
+      .sort(function (a, b) { return (a.created || 0) - (b.created || 0); });
+  }
+  function plansList() { return [builtinPlan()].concat(customPlans()); }
+  function activePlan() {
+    var ps = (state && state.settings && state.settings.plans) || {}, p = ps[state && state.settings && state.settings.activePlan];
+    return p && !p.archived && p.days && p.days.length ? p : builtinPlan();
+  }
+  function sameMuscleAlts(id, exclude) {
+    var c = CAT[id];
+    if (!c || !c.muscles.length || c.muscles[0] === 'other') return [];
+    var m = c.muscles[0];
+    return LIB_IDS.filter(function (x) { return x !== id && exclude.indexOf(x) < 0 && CAT[x].muscles[0] === m; })
+      .sort(function (a, b) { return (CAT[b].ours ? 1 : 0) - (CAT[a].ours ? 1 : 0) || (CAT[b].img ? 1 : 0) - (CAT[a].img ? 1 : 0); })
+      .slice(0, 6);
+  }
+  function rebuildPlans() {
+    Object.keys(PLAN).forEach(function (k) { if (PLAN[k].custom) delete PLAN[k]; });
+    var ps = state.settings.plans || {};
+    Object.keys(ps).forEach(function (pid) {
+      var p = ps[pid];
+      if (!p || !Array.isArray(p.days)) return;
+      // removed days stay known so sessions logged on them keep their name in History
+      p.days.concat(p.removedDays || []).forEach(function (d, i) {
+        if (!d || !d.id) return;
+        var ids = (d.slots || []).map(function (s) { return s.id; });
+        PLAN[d.id] = { label: d.label || 'Day ' + (i + 1), wk: 'Day ' + (i + 1), tone: (d.tone != null ? d.tone : i) % TONES, plan: pid, custom: true,
+          slots: (d.slots || []).filter(function (s) { return s && CAT[s.id]; }).map(function (s) {
+            return { id: s.id, sets: s.sets || 3, lo: s.lo || 8, hi: Math.max(s.hi || 12, s.lo || 8), rest: s.rest || 90, alts: sameMuscleAlts(s.id, ids) };
+          }) };
+      });
+    });
+    DAYS = activePlan().days.map(function (d) { return d.id; }).filter(function (d) { return PLAN[d]; });
+    if (!DAYS.length) DAYS = BUILTIN_DAYS.slice();
+    rebuildExmap();
+    if (!PLAN[state.day]) state.day = defaultDay();
+  }
+  function dayLabel(day) { return PLAN[day] ? PLAN[day].label : 'Removed day'; }
+  function planName(pid) {
+    if (!pid || pid === BUILTIN_ID) return builtinPlan().name;
+    var p = state.settings.plans[pid];
+    return p ? p.name : '';
+  }
+  /* name of the plan a day belongs to, when that is not the plan in use */
+  function otherPlan(day) {
+    var pd = PLAN[day];
+    return pd && pd.plan && pd.plan !== activePlan().id ? planName(pd.plan) : '';
+  }
+  /* a stored session looks valid (its day may belong to any plan, even one not loaded yet) */
+  function okSession(d) {
+    return !!(d && typeof d.day === 'string' && /^[\w-]{1,40}$/.test(d.day) && d.entries && typeof d.entries === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(d.date || ''));
+  }
+  function slotById(day, id) { return PLAN[day] ? PLAN[day].slots.filter(function (s) { return s.id === id; })[0] || null : null; }
+  function slotOf(day, id) { return PLAN[day] ? PLAN[day].slots.filter(function (s) { return s.id === id || s.alts.indexOf(id) >= 0; })[0] || null : null; }
   function effId(d, slot) { var a = d && d.swaps && d.swaps[slot.id]; return a && slot.alts.indexOf(a) >= 0 ? a : slot.id; }
   function slotEx(d, slot) { return exFor(d.day, slot, effId(d, slot)); }
   function slotIndex(day, id) { var s = slotOf(day, id); return s ? PLAN[day].slots.indexOf(s) : 99; }
@@ -642,11 +856,13 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     wheel: pl('f', '6,54 16,54 22,42') + pl('f', '22,42 40,38') + hd(46, 36) + pl('f', '38,39 50,52') + ci('w', 51, 53, 5),
     hangraise: pl('q', '18,6 46,6') + pl('f', '32,6 32,40') + hd(38, 15) + pl('f', '32,40 54,40')
   };
-  function picEl(id, n) {
-    var box = h('div', { class: 'pic', 'aria-hidden': 'true' });
+  /* exercise picture: Everkinetic drawing (start and end position, alternating) or the app's own pictogram */
+  function picEl(id, n, still) {
     var c = CAT[id];
-    box.innerHTML = '<svg viewBox="0 0 64 64">' + (c ? PIC[c.pic] || '' : '') + '</svg>';
-    box.append(h('span', { class: 'pn', text: String(n) }));
+    var box = h('div', { class: 'pic' + (c && c.img ? ' draw' + (still ? ' sm' : ' anim') : ''), 'aria-hidden': 'true' });
+    if (c && c.img) box.append(h('span', { class: 'fr' }, h('img', { src: c.img, alt: '', loading: 'lazy', decoding: 'async' })));
+    else box.innerHTML = '<svg viewBox="0 0 64 64">' + (c ? PIC[c.pic] || '' : '') + '</svg>';
+    if (n != null) box.append(h('span', { class: 'pn', text: String(n) }));
     return box;
   }
 
@@ -659,7 +875,22 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   function weekStartOf(s) { var d = parseISO(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return iso(d); }
   function fmtShort(s) { return parseISO(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
   function fmtLong(s) { return parseISO(s).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
-  function defaultDay() { return { 1: 'push', 2: 'pull', 3: 'legs', 4: 'legs', 5: 'upper' }[new Date().getDay()] || 'push'; }
+  function weekdayDay() { return { 1: 'push', 2: 'pull', 3: 'legs', 4: 'legs', 5: 'upper' }[new Date().getDay()] || 'push'; }
+  /* built-in plan: by weekday; your own plans: the day after the last one you trained (today's if you trained today) */
+  function defaultDay() {
+    if (!state || !state.settings) return weekdayDay();
+    var ap = activePlan();
+    if (ap.builtin) return weekdayDay();
+    var ids = ap.days.map(function (d) { return d.id; }).filter(function (d) { return PLAN[d]; }), last = null;
+    if (!ids.length) return weekdayDay();
+    sessionDocs().forEach(function (d) {
+      if (ids.indexOf(d.day) < 0 || !docKeys(d).length) return;
+      if (!last || d.date > last.date || d.date === last.date && (d.updated || 0) > (last.updated || 0)) last = d;
+    });
+    if (!last) return ids[0];
+    if (last.date === todayISO()) return last.day;
+    return ids[(ids.indexOf(last.day) + 1) % ids.length];
+  }
   function num(s) {
     if (s == null) return null;
     var t = String(s).trim().replace(',', '.');
@@ -689,10 +920,11 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     tab: 'log', day: defaultDay(), date: todayISO(), logs: {}, body: {}, draft: null, dirty: false,
     busy: 0, kind: 'connecting', status: 'connecting', progEx: null, metric: null, charts: {},
     week: weekStartOf(todayISO()), bmetric: 'weight', bform: null, confirmDel: null, confirmBody: null,
-    settings: { rest: {}, swaps: {}, deloads: [] },
+    settings: { rest: {}, swaps: {}, deloads: [], plans: {}, activePlan: BUILTIN_ID },
+    editPlan: null, pick: null, lib: { q: '', m: 'all', eq: 'all', open: null }, howOpen: null, confirmPlan: null, confirmDay: null,
     restT: null, autoRest: true, sound: true, confirmReset: false, swapOpen: null, swapAlways: false,
     healthMsg: '', healthSilent: false, importMsg: '', report: null, reportMsg: '', vision: null,
-    loaded: false, dataMsg: '', backup: null
+    loaded: false, dataMsg: '', backup: null, dayPicked: false
   };
   function applySettings(v) {
     if (!v || typeof v !== 'object') return;
@@ -700,6 +932,9 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     if (v.rest && typeof v.rest === 'object') s.rest = Object.assign({}, v.rest);
     if (v.swaps && typeof v.swaps === 'object') s.swaps = Object.assign({}, v.swaps);
     if (Array.isArray(v.deloads)) s.deloads = v.deloads.filter(function (x) { return typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x); });
+    if (v.plans && typeof v.plans === 'object') s.plans = JSON.parse(JSON.stringify(v.plans));
+    if (typeof v.activePlan === 'string') s.activePlan = v.activePlan;
+    rebuildPlans();
   }
   try {
     var pr = JSON.parse(localStorage.getItem('liftlog.prefs') || '{}');
@@ -722,7 +957,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     return o;
   }
   function newDraft(day, date, swaps) {
-    var d = { id: 's_' + date + '_' + day, date: date, day: day, entries: {}, swaps: swaps || defaultSwaps(day), note: '',
+    var d = { id: 's_' + date + '_' + day, date: date, day: day, plan: PLAN[day].plan || null, entries: {}, swaps: swaps || defaultSwaps(day), note: '',
       startedAt: null, endedAt: null, hrAvg: null, hrMax: null };
     PLAN[day].slots.forEach(function (s) { d.entries[effId(d, s)] = blankSets(s.sets); });
     return d;
@@ -760,7 +995,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       sets.forEach(function (s, i) { if (num(s.w) != null || num(s.r) != null) last = i; });
       if (last >= 0) entries[k] = sets.slice(0, last + 1).map(function (s) { return { w: num(s.w), r: num(s.r) }; });
     });
-    return { id: d.id, date: d.date, day: d.day, entries: entries, swaps: Object.assign({}, d.swaps || {}), note: (d.note || '').slice(0, 2000),
+    return { id: d.id, date: d.date, day: d.day, plan: d.plan || (PLAN[d.day] && PLAN[d.day].plan) || null, entries: entries, swaps: Object.assign({}, d.swaps || {}), note: (d.note || '').slice(0, 2000),
       startedAt: d.startedAt || null, endedAt: d.endedAt || null, hrAvg: d.hrAvg || null, hrMax: d.hrMax || null, updated: Date.now() };
   }
   function isEmpty(doc) { return !Object.keys(doc.entries).length && !(doc.note || '').trim() && !doc.startedAt; }
@@ -1002,18 +1237,18 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   function backupCounts(o) {
     var n = { sessions: 0, body: 0 };
     if (!o || typeof o !== 'object') return n;
-    Object.keys(o.logs || {}).forEach(function (k) { var d = o.logs[k]; if (d && PLAN[d.day] && d.entries && d.date) n.sessions++; });
+    Object.keys(o.logs || {}).forEach(function (k) { if (okSession(o.logs[k])) n.sessions++; });
     Object.keys(o.body || {}).forEach(function (k) { var d = o.body[k]; if (d && d.date) n.body++; });
     return n;
   }
   function hasData(o) { var n = backupCounts(o); return n.sessions + n.body > 0; }
   function applySnapshot(o) {
     var logs = {}, body = {};
-    Object.keys(o.logs || {}).forEach(function (k) { var d = o.logs[k]; if (d && PLAN[d.day] && d.entries && d.date) logs[d.id || k] = d; });
+    if (o.settings) applySettings(o.settings);
+    Object.keys(o.logs || {}).forEach(function (k) { var d = o.logs[k]; if (okSession(d)) logs[d.id || k] = d; });
     Object.keys(o.body || {}).forEach(function (k) { var d = o.body[k]; if (d && d.date) body[d.id || k] = d; });
     state.logs = logs;
     state.body = body;
-    if (o.settings) applySettings(o.settings);
     if (o.prefs) {
       if (typeof o.prefs.autoRest === 'boolean') state.autoRest = o.prefs.autoRest;
       if (typeof o.prefs.sound === 'boolean') state.sound = o.prefs.sound;
@@ -1059,9 +1294,16 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   /* merge a backup into what is here: per session/day the newer copy wins; settings only fill gaps */
   function importBackup(o) {
     var sess = [], bod = [], changed = false, s = (o && o.settings) || {};
+    if (s.plans && typeof s.plans === 'object') Object.keys(s.plans).forEach(function (pid) {
+      var bp = s.plans[pid], cur = state.settings.plans[pid];
+      if (!bp || !Array.isArray(bp.days) || cur && (cur.updated || 0) >= (bp.updated || 0)) return;
+      state.settings.plans[pid] = JSON.parse(JSON.stringify(bp));
+      changed = true;
+    });
+    if (changed) rebuildPlans();
     Object.keys((o && o.logs) || {}).forEach(function (k) {
       var d = o.logs[k];
-      if (!d || !PLAN[d.day] || !d.entries || !/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) return;
+      if (!okSession(d)) return;
       var id = 's_' + d.date + '_' + d.day, cur = state.logs[id];
       if (cur && (cur.updated || 0) >= (d.updated || 0)) return;
       sess.push(Object.assign({}, d, { id: id }));
@@ -1078,13 +1320,13 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     });
     if (s.swaps && typeof s.swaps === 'object') Object.keys(s.swaps).forEach(function (k) {
       var sl = null;
-      DAYS.forEach(function (d) { sl = sl || slotById(d, k); });
+      Object.keys(PLAN).forEach(function (d) { sl = sl || slotById(d, k); });
       if (!state.settings.swaps[k] && sl && sl.alts.indexOf(s.swaps[k]) >= 0) { state.settings.swaps[k] = s.swaps[k]; changed = true; }
     });
     if (Array.isArray(s.deloads)) s.deloads.forEach(function (w) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(w) && state.settings.deloads.indexOf(w) < 0) { state.settings.deloads.push(w); changed = true; }
     });
-    if (changed) { state.settings.deloads.sort(); saveSettings(); }
+    if (changed) { state.settings.deloads.sort(); rebuildPlans(); saveSettings(); }
     var p;
     if (state.kind === 'cloud') {
       p = saving;
@@ -1148,6 +1390,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   }
   function scheduleSave() {
     state.dirty = true;
+    state.dayPicked = true;
     setStatus('saving');
     clearTimeout(timer);
     timer = setTimeout(flush, 600);
@@ -1176,16 +1419,25 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   function onSnap(snap) {
     var m = {}, b = {};
     snap.docs.forEach(function (d) {
+      if (d.id !== 'settings') return;
       var v = d.data();
-      if (d.id === 'settings') { if (v && !setSaveT) applySettings(v); return; }
+      if (v && !setSaveT && !planT) applySettings(v);
+    });
+    snap.docs.forEach(function (d) {
+      var v = d.data();
+      if (d.id === 'settings') return;
       if (d.id.indexOf('b_') === 0) { if (v && v.date) b[d.id] = v; return; }
-      if (v && v.entries && v.date && PLAN[v.day]) m[d.id] = v;
+      if (okSession(v)) m[d.id] = v;
     });
     state.logs = m;
     state.body = b;
     if (state.status === 'connecting') setStatus('saved');
-    if (state.tab === 'log') {
-      if (!state.dirty && !state.busy && !inputFocused()) { reloadDraft(); renderLog(); }
+    var idle = !state.dirty && !state.busy && !inputFocused();
+    if (idle && !state.dayPicked) state.day = defaultDay();
+    if (topView()) {
+      if (idle) { reloadDraft(); render(); }
+    } else if (state.tab === 'log') {
+      if (idle) { reloadDraft(); renderLog(); }
     } else if (!inputFocused()) {
       render();
     }
@@ -1200,7 +1452,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
           return (user ? user.id() : Promise.resolve(null)).then(function (uid) {
             c.use('sample').then(function (smp) {
               if (!smp) return null;
-              return smp.limits().then(function (l) { if (l && l.images) { state.vision = smp; if (state.tab === 'body') renderBody(); } });
+              return smp.limits().then(function (l) { if (l && l.images) { state.vision = smp; if (state.tab === 'body' && !topView()) renderBody(); } });
             }).catch(function () { /* reading images unavailable */ });
             if (db && uid) {
               col = db.collection('data/users/' + uid);
@@ -1218,6 +1470,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       state.kind = 'local';
       var src = loadLocal();
       if (src === 'backup') setTimeout(function () { setTab('history'); var el = document.getElementById('dataPanel'); if (el) el.scrollIntoView({ block: 'start' }); }, 0);
+      if (!state.dayPicked) state.day = defaultDay();
       if (!state.dirty && !state.busy && !inputFocused()) reloadDraft();
       setStatus('saved');
       render();
@@ -1236,7 +1489,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     clearTimeout(setSaveT);
     setSaveT = setTimeout(function () {
       var s = state.settings;
-      var data = { rest: Object.assign({}, s.rest), swaps: Object.assign({}, s.swaps), deloads: s.deloads.slice(), updated: Date.now() };
+      var data = { rest: Object.assign({}, s.rest), swaps: Object.assign({}, s.swaps), deloads: s.deloads.slice(),
+        plans: JSON.parse(JSON.stringify(s.plans || {})), activePlan: s.activePlan || BUILTIN_ID, updated: Date.now() };
       var p = state.kind === 'cloud' ? saving.then(function () { return col.doc('settings').set(data); }) : Promise.resolve();
       p.then(function () { setSaveT = null; }, function () { setSaveT = null; setStatus('error'); });
     }, 700);
@@ -1324,6 +1578,12 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       var sw = defaultSwaps(day);
       plan[day] = PLAN[day].slots.map(function (s) { var e = exFor(day, s, sw[s.id] || s.id); addEx(e); return e.id; });
     });
+    var days = DAYS.map(function (d) { return { id: d, label: PLAN[d].label, tone: (PLAN[d].tone || 0) % TONES }; });
+    var lastDay = null;
+    sessionDocs().forEach(function (d) {
+      if (DAYS.indexOf(d.day) < 0 || !docKeys(d).length) return;
+      if (!lastDay || d.date > lastDay.date) lastDay = { id: d.day, date: d.date };
+    });
     sessionDocs().forEach(function (d) {
       if (d.date !== today && !isRunning(d)) return;
       var order = PLAN[d.day].slots.map(function (s) { var e = exFor(d.day, s, effId(d, s)); addEx(e); return e.id; });
@@ -1331,10 +1591,12 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       Object.keys(d.entries || {}).forEach(function (k) {
         en[k] = (d.entries[k] || []).map(function (x) { return [x && x.w != null ? x.w : null, x && x.r != null ? x.r : null]; });
       });
-      sessions.push({ id: d.id, day: d.day, date: d.date, entries: en, order: order, startedAt: d.startedAt || null, endedAt: d.endedAt || null,
-        hrAvg: d.hrAvg || null, hrMax: d.hrMax || null });
+      sessions.push({ id: d.id, day: d.day, label: PLAN[d.day].label, tone: (PLAN[d.day].tone || 0) % TONES, date: d.date, entries: en, order: order,
+        startedAt: d.startedAt || null, endedAt: d.endedAt || null, hrAvg: d.hrAvg || null, hrMax: d.hrMax || null });
     });
-    return { v: 2, ts: Date.now(), today: today, rest: state.settings.rest, plan: plan, ex: ex, last: last, sugg: sugg, best: best, sessions: sessions };
+    var ap = activePlan();
+    return { v: 3, ts: Date.now(), today: today, rest: state.settings.rest, planName: ap.name, rot: !ap.builtin, days: days, lastDay: lastDay,
+      plan: plan, ex: ex, last: last, sugg: sugg, best: best, sessions: sessions };
   }
   function pushWatch() {
     if (!NATIVE || !NATIVE.syncWatch) return;
@@ -1426,6 +1688,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   function saveNow() { state.dirty = true; return flush(); }
   function startWorkout() {
     unlockAudio();
+    state.dayPicked = true;
     state.draft.startedAt = Date.now();
     state.draft.endedAt = null;
     state.confirmReset = false;
@@ -1503,11 +1766,11 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     dock.hidden = !a && !r;
     document.body.classList.toggle('docked', !dock.hidden);
     if (dock.hidden) { if (tickId) { clearInterval(tickId); tickId = null; } return; }
-    dock.className = 'dock d-' + (r ? r.day : a.day);
+    dock.className = 'dock ' + dc(r ? r.day : a.day);
     $('#restPane').hidden = !r;
     $('#wkRow').hidden = !a;
     if (r) $('#restName').textContent = r.name;
-    if (a) $('#dockWkLbl').textContent = 'Workout · ' + PLAN[a.day].label;
+    if (a) $('#dockWkLbl').textContent = 'Workout · ' + dayLabel(a.day);
     updateTimes();
     if (!tickId) tickId = setInterval(function () {
       if (!activeSession() && !state.restT) { renderDock(); return; }
@@ -1518,14 +1781,17 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   /* ---------- views ---------- */
   function setTab(t) {
     flush();
+    clearViews();
     state.tab = t;
     render();
   }
   function render() {
     document.querySelectorAll('.tabs [data-tab]').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)); });
+    var top = topView();
+    if (top) { renderSub(top); renderDock(); return; }
     var titles = { log: 'Workout', progress: 'Progress', body: 'Body', history: 'History' };
     $('#ptitle').textContent = titles[state.tab];
-    $('#psub').textContent = state.tab === 'log' ? fmtLong(state.date) + ' · ' + PLAN[state.day].label + ' day'
+    $('#psub').textContent = state.tab === 'log' ? fmtLong(state.date) + ' · ' + dayLabel(state.day) + ' day'
       : state.tab === 'progress' ? 'Your training at a glance'
       : state.tab === 'body' ? 'Weight, measurements and body composition'
       : 'Every session you have logged';
@@ -1538,6 +1804,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   function setDay(d) {
     flush();
     state.day = d;
+    state.dayPicked = true;
     state.swapOpen = null;
     reloadDraft();
     renderLog();
@@ -1599,7 +1866,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       h('p', { class: 'k', text: 'Machine taken? Pick an alternative for the same muscle. Each exercise keeps its own history.' }),
       h('div', { class: 'swaplist' }, [slot.id].concat(slot.alts).map(function (id) {
         return h('button', { type: 'button', class: 'swapopt', 'aria-pressed': String(id === cur), onclick: function () { swapTo(slot, id, state.swapAlways); } },
-          h('span', { text: CAT[id].name }), h('small', { text: id === slot.id ? 'Plan' : (state.settings.swaps[slot.id] === id ? 'Your default' : '') }));
+          h('span', { text: exName(id) }), h('small', { text: id === slot.id ? 'Plan' : (state.settings.swaps[slot.id] === id ? 'Your default' : '') }));
       })),
       h('label', { class: 'opt', for: 'swapAlways' },
         h('input', { type: 'checkbox', id: 'swapAlways', checked: state.swapAlways, onchange: function (ev) { state.swapAlways = ev.target.checked; } }),
@@ -1633,19 +1900,23 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       } }) : null,
       slot.alts.length ? h('button', { type: 'button', class: 'btn small', 'aria-expanded': String(state.swapOpen === slot.id), text: 'Swap', onclick: function () {
         state.swapOpen = state.swapOpen === slot.id ? null : slot.id; renderLog();
-      } }) : null);
+      } }) : null,
+      h('button', { type: 'button', class: 'btn small', 'aria-expanded': String(state.howOpen === slot.id), text: 'How to', onclick: function () {
+        state.howOpen = state.howOpen === slot.id ? null : slot.id; renderLog();
+      } }));
     return h('section', { class: 'card' },
       h('header', { class: 'chead' },
         picEl(e.id, i + 1),
         h('div', null, h('h3', { text: e.name }),
           h('p', { class: 'target', text: e.sets + ' × ' + e.lo + '–' + e.hi + ' reps' + (e.bw ? ' · bodyweight, add kg if weighted' : '') }),
-          e.alt ? h('p', { class: 'subnote', text: 'Instead of ' + CAT[slot.id].name }) : null)),
+          e.alt ? h('p', { class: 'subnote', text: 'Instead of ' + exName(slot.id) }) : null)),
       lastLine,
       suggLine,
       prBox,
       h('div', { class: 'sets' }, sets.map(function (s, j) { return setRow(e, j, sg); })),
       foot,
       state.swapOpen === slot.id ? swapPanel(slot) : null,
+      state.howOpen === slot.id ? howPanel(e) : null,
       restRow(e));
   }
 
@@ -1696,13 +1967,26 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   }
 
   function renderLog() {
+    if (topView()) return;
+    if (!state.draft || state.draft.day !== state.day || state.draft.date !== state.date) { flush(); reloadDraft(); }
     var v = $('#view');
-    if (state.tab === 'log') $('#psub').textContent = fmtLong(state.date) + ' · ' + PLAN[state.day].label + ' day';
-    v.className = 'view d-' + state.day;
-    var chips = DAYS.map(function (d) {
-      return h('button', { type: 'button', class: 'daychip d-' + d, 'aria-pressed': String(d === state.day), onclick: function () { setDay(d); } },
-        h('span', { class: 'disc' }), h('span', { class: 'dn', text: PLAN[d].label }), h('span', { class: 'dw', text: PLAN[d].wk }));
+    if (state.tab === 'log') $('#psub').textContent = fmtLong(state.date) + ' · ' + dayLabel(state.day) + ' day';
+    v.className = 'view ' + dc(state.day);
+    var ap = activePlan(), shown = DAYS.indexOf(state.day) >= 0 ? DAYS : [state.day].concat(DAYS);
+    var chips = shown.map(function (d) {
+      var foreign = DAYS.indexOf(d) < 0;
+      return h('button', { type: 'button', class: 'daychip ' + dc(d), 'aria-pressed': String(d === state.day), onclick: function () { setDay(d); } },
+        h('span', { class: 'disc' }), h('span', { class: 'dn', text: PLAN[d].label }),
+        h('span', { class: 'dw', text: foreign ? 'Other plan' : PLAN[d].custom ? PLAN[d].slots.length + ' ex' : PLAN[d].wk }));
     });
+    var planBar = h('button', { type: 'button', class: 'planbar', onclick: function () { pushView({ v: 'plans' }); } },
+      h('span', { class: 'pt' }, h('span', { class: 'pk', text: 'Plan' }), h('span', { class: 'pv', text: ap.name })),
+      h('span', { class: 'go', text: 'Plans & exercises' }));
+    var slots = PLAN[state.day].slots;
+    var emptyDay = slots.length ? null : h('section', { class: 'panel empty' },
+      h('h2', { text: 'No exercises on this day yet' }),
+      h('p', { text: 'Add exercises from the library in the plan editor.' }),
+      PLAN[state.day].custom && planDoc(PLAN[state.day].plan) ? h('button', { type: 'button', class: 'btn primary', text: 'Edit plan', onclick: function () { pushView({ v: 'edit', id: PLAN[state.day].plan }); } }) : null);
     var dateIn = h('input', { type: 'date', id: 'sdate', value: state.date, onchange: function (ev) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(ev.target.value)) return;
       flush();
@@ -1712,16 +1996,15 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       renderLog();
     } });
     v.replaceChildren(
+      planBar,
       h('div', { class: 'days' }, chips),
       h('div', { class: 'datebar' },
         h('label', { for: 'sdate', text: 'Session date' }), dateIn,
         h('button', { type: 'button', class: 'btn small', text: 'Today', onclick: function () {
           flush(); state.date = todayISO(); reloadDraft(); renderLog();
         } })),
-      ...[restoreBanner(), deloadBanner()].filter(Boolean),
-      wkCard(),
-      h('div', { class: 'summary', id: 'sum' }),
-      ...PLAN[state.day].slots.map(exCard),
+      ...[restoreBanner(), deloadBanner(), emptyDay || wkCard(), emptyDay ? null : h('div', { class: 'summary', id: 'sum' })].filter(Boolean),
+      ...slots.map(exCard),
       h('div', { class: 'card note' },
         h('label', { for: 'snote', text: 'Session notes' }),
         h('textarea', { id: 'snote', placeholder: 'Sleep, joints, what to change next time', value: state.draft.note, oninput: function (ev) {
@@ -1851,7 +2134,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     var t = {};
     DAYS.forEach(function (day) {
       var sw = defaultSwaps(day);
-      PLAN[day].slots.forEach(function (s) { (CAT[sw[s.id] || s.id]).muscles.forEach(function (m) { t[m] = (t[m] || 0) + s.sets; }); });
+      PLAN[day].slots.forEach(function (s) { ((CAT[sw[s.id] || s.id] || {}).muscles || []).forEach(function (m) { t[m] = (t[m] || 0) + s.sets; }); });
     });
     return t;
   }
@@ -1879,10 +2162,10 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     var targets = muscleTargets();
     var cal = h('div', { class: 'cal' }, [0, 1, 2, 3, 4, 5, 6].map(function (i) {
       var dt = addDays(ws, i), days = wd.days[dt] || [];
-      return h('div', { class: 'cell' + (dt === today ? ' today' : '') + (days.length ? ' on' : ''), title: days.map(function (x) { return PLAN[x].label; }).join(', ') || null },
+      return h('div', { class: 'cell' + (dt === today ? ' today' : '') + (days.length ? ' on' : ''), title: days.map(dayLabel).join(', ') || null },
         h('span', { class: 'wl', text: 'MTWTFSS'[i] }),
         h('span', { class: 'wd', text: String(parseISO(dt).getDate()) }),
-        h('span', { class: 'ds' }, days.map(function (x) { return h('i', { class: 'd-' + x }); })));
+        h('span', { class: 'ds' }, days.map(function (x) { return h('i', { class: dc(x) }); })));
     }));
     var deload = isDeloadWeek(ws);
     var bars = h('div', { class: 'mbars' }, MUSCLES.filter(function (m) { return targets[m[0]]; }).map(function (m) {
@@ -1892,13 +2175,13 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         h('span', { class: 'track' }, h('span', { class: 'fill', style: 'display:block;width:' + Math.min(100, Math.round(done / tgt * 100)) + '%' })),
         h('span', { class: 'n', text: done + '/' + tgt }));
     }));
-    var weeks = [];
+    var weeks = [], per = Math.max(1, DAYS.length);
     for (var i = 7; i >= 0; i--) weeks.push(addDays(ws, -7 * i));
     var adh = h('div', { class: 'adh', role: 'img', 'aria-label': 'Sessions per week, last 8 weeks' }, weeks.map(function (w) {
       var n = weekData(w).sessions;
-      return h('div', { class: 'col' + (w === ws ? ' sel' : '') + (n >= 4 ? ' full' : '') },
+      return h('div', { class: 'col' + (w === ws ? ' sel' : '') + (n >= per ? ' full' : '') },
         h('span', { class: 'c', text: String(n) }),
-        h('span', { class: 'trk' }, h('span', { class: 'bar', style: 'height:' + (n ? Math.max(12, Math.round(Math.min(n, 4) / 4 * 100)) : 0) + '%' })),
+        h('span', { class: 'trk' }, h('span', { class: 'bar', style: 'height:' + (n ? Math.max(12, Math.round(Math.min(n, per) / per * 100)) : 0) + '%' })),
         h('span', { class: 'l', text: String(parseISO(w).getDate()) + '/' + (parseISO(w).getMonth() + 1) }));
     }));
     var title = ws === cur ? 'This week' : 'Week of ' + fmtShort(ws);
@@ -1909,7 +2192,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         h('button', { type: 'button', class: 'btn small', 'aria-label': 'Next week', text: '›', disabled: ws >= cur, onclick: function () { state.week = addDays(ws, 7); renderProgress(); } })),
       cal,
       h('div', { class: 'wstats' },
-        ringBox(Math.min(1, wd.sessions / 4), wd.sessions + '/4', 'sessions'),
+        ringBox(Math.min(1, wd.sessions / per), wd.sessions + '/' + per, 'sessions'),
         h('div', { class: 'legend' },
           h('div', null, h('i', { style: 'background:var(--accent)' }), 'Sets done', h('b', { text: String(wd.sets) })),
           h('div', null, h('i', { style: 'background:var(--warn)' }), 'Time trained', h('b', { text: wd.ms ? fmtDur(wd.ms) : '–' })),
@@ -1932,24 +2215,29 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       })) : h('p', { class: 'muted', text: 'Your best lift for each exercise appears here after your first sessions.' }));
   }
   function renderProgress() {
+    if (topView()) return;
     var v = $('#view');
-    var logged = loggedIds();
-    if (!state.progEx || !EXMAP[state.progEx]) state.progEx = logged[0] || PLAN.push.slots[0].id;
-    var e = EXMAP[state.progEx];
-    v.className = 'view d-' + e.day;
+    var logged = loggedIds().filter(function (id) { return CAT[id]; });
+    var first = DAYS.map(function (d) { return PLAN[d].slots[0]; }).filter(Boolean)[0];
+    if (!state.progEx || !exInfo(state.progEx)) state.progEx = logged[0] || (first ? first.id : BUILTIN_DAYS.length && PLAN.push.slots[0].id);
+    var e = exInfo(state.progEx);
+    v.className = 'view ' + dc(e.day);
     var pts = seriesFor(e.id);
     var weighted = pts.some(function (p) { return p.top > 0; });
     var avail = Object.keys(METRICS).filter(function (k) { return weighted || !METRICS[k].weighted; });
     if (!state.metric || avail.indexOf(state.metric) < 0) state.metric = avail[0];
-    var altIds = logged.filter(function (id) { return EXMAP[id] && EXMAP[id].alt; });
+    var inPlan = {};
+    DAYS.forEach(function (d) { PLAN[d].slots.forEach(function (x) { inPlan[x.id] = 1; }); });
+    var otherIds = logged.filter(function (id) { return !inPlan[id]; }).sort(function (a, b) { return exName(a).localeCompare(exName(b)); });
+    if (!inPlan[state.progEx] && otherIds.indexOf(state.progEx) < 0) otherIds.unshift(state.progEx);
     var sel = h('select', { id: 'pex', 'aria-label': 'Exercise', onchange: function (ev) { state.progEx = ev.target.value; state.metric = null; renderProgress(); } },
-      DAYS.map(function (d) {
+      DAYS.filter(function (d) { return PLAN[d].slots.length; }).map(function (d) {
         return h('optgroup', { label: PLAN[d].label + ' day' }, PLAN[d].slots.map(function (x) {
-          return h('option', { value: x.id, text: CAT[x.id].name, selected: x.id === state.progEx });
+          return h('option', { value: x.id, text: exName(x.id), selected: x.id === state.progEx });
         }));
       }),
-      altIds.length ? h('optgroup', { label: 'Swapped exercises' }, altIds.map(function (id) {
-        return h('option', { value: id, text: CAT[id].name, selected: id === state.progEx });
+      otherIds.length ? h('optgroup', { label: 'Other exercises you logged' }, otherIds.map(function (id) {
+        return h('option', { value: id, text: exName(id), selected: id === state.progEx });
       })) : null);
     var seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Metric' }, avail.map(function (k) {
       return h('button', { type: 'button', 'aria-pressed': String(k === state.metric), text: METRICS[k].label, onclick: function () { state.metric = k; renderProgress(); } });
@@ -1960,7 +2248,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       kids.push(h('div', { class: 'panel empty' },
         h('h2', { text: 'Nothing logged for this lift yet' }),
         h('p', { text: 'Record a set on the Log tab and your trend shows up here.' }),
-        h('button', { type: 'button', class: 'btn', text: 'Go to Log', onclick: function () { state.day = e.day; flush(); reloadDraft(); setTab('log'); } })));
+        h('button', { type: 'button', class: 'btn', text: 'Go to Log', onclick: function () { flush(); state.day = e.day; state.dayPicked = true; reloadDraft(); setTab('log'); } })));
     } else {
       var m = METRICS[state.metric];
       var series = pts.map(function (p) { return { date: p.date, t: p.t, v: p[m.key] }; });
@@ -2489,8 +2777,9 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     return rows.map(function (r) { return r.join(','); }).join('\n');
   }
   function renderBody() {
+    if (topView()) return;
     var v = $('#view');
-    v.className = 'view d-pull';
+    v.className = 'view tn1';
     var docs = bodyDocs(), kids = [];
     if (!state.bform) state.bform = { date: todayISO() };
     var withW = docs.filter(function (d) { return d.weight != null; });
@@ -2613,11 +2902,11 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
 
   /* ---------- history ---------- */
   function sessionsCsvText() {
-    var rows = [['date', 'day', 'exercise', 'set', 'kg', 'reps']];
+    var rows = [['date', 'day', 'exercise', 'set', 'kg', 'reps', 'plan']];
     sessionDocs().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (doc) {
       Object.keys(doc.entries || {}).sort(function (a, b) { return slotIndex(doc.day, a) - slotIndex(doc.day, b); }).forEach(function (k) {
         (doc.entries[k] || []).forEach(function (s, i) {
-          if (s && (s.r != null || s.w != null)) rows.push([doc.date, PLAN[doc.day].label, exName(k), i + 1, s.w == null ? '' : s.w, s.r == null ? '' : s.r]);
+          if (s && (s.r != null || s.w != null)) rows.push([doc.date, dayLabel(doc.day), exName(k), i + 1, s.w == null ? '' : s.w, s.r == null ? '' : s.r, PLAN[doc.day] ? planName(PLAN[doc.day].plan) : '']);
         });
       });
     });
@@ -2669,7 +2958,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     var st = null;
     try { st = JSON.parse(str); } catch (e) { /* ignore */ }
     state.dataMsg = st && st.error ? st.error : st && st.lastAt ? 'Backup saved.' : '';
-    if (state.tab === 'history') renderHistory();
+    if (state.tab === 'history' && !topView()) renderHistory();
   };
   window.liftlogRestore = function (str) {
     var o = parseLenient(str);
@@ -2735,6 +3024,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   }
 
   function renderHistory() {
+    if (topView()) return;
     var v = $('#view');
     v.className = 'view';
     var docs = sessionDocs().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
@@ -2755,20 +3045,21 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         return h('div', { class: 'ex' }, h('b', { text: exName(k) }), h('span', { class: 'muted', text: setText(s, e.bw) }));
       });
       var confirming = state.confirmDel === doc.id;
-      return h('details', { class: 'sess d-' + doc.day, open: confirming },
+      return h('details', { class: 'sess ' + dc(doc.day), open: confirming },
         h('summary', null,
           h('span', { class: 'disc' }),
-          h('span', { class: 't', text: fmtLong(doc.date) + ' · ' + PLAN[doc.day].label }),
+          h('span', { class: 't', text: fmtLong(doc.date) + ' · ' + dayLabel(doc.day) }),
           prs ? h('span', { class: 'tag t-good', text: prs + (prs === 1 ? ' record' : ' records') }) : null,
           h('span', { class: 's', text: sets + ' sets' + (vol > 0 ? ' · ' + big(vol) + ' kg' : '') +
             (doc.startedAt && doc.endedAt ? ' · ' + fmtDur(doc.endedAt - doc.startedAt) : isRunning(doc) ? ' · in progress' : '') })),
         h('div', { class: 'body' },
+          otherPlan(doc.day) ? h('p', { class: 'muted', text: 'Plan: ' + otherPlan(doc.day) }) : null,
           exRows,
           doc.hrAvg ? h('p', { class: 'muted', text: hrText(doc) }) : null,
           doc.note && doc.note.trim() ? h('p', { class: 'muted', text: 'Notes: ' + doc.note }) : null,
           h('div', { class: 'acts' },
             h('button', { type: 'button', class: 'btn small', text: 'Open in Log', onclick: function () {
-              flush(); state.day = doc.day; state.date = doc.date; reloadDraft(); setTab('log');
+              flush(); state.day = doc.day; state.dayPicked = true; state.date = doc.date; reloadDraft(); setTab('log');
             } }),
             h('button', { type: 'button', class: 'btn small danger', text: confirming ? 'Tap again to delete' : 'Delete', onclick: function () {
               if (state.confirmDel === doc.id) { state.confirmDel = null; deleteSession(doc.id); }
@@ -2783,17 +3074,436 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       dataPanel());
   }
 
+  /* ---------- plans, plan editor and exercise library ----------
+     Sub-views open on top of the current tab. Each one adds a browser history entry, so the phone's back
+     button (and the browser's) steps back through them. */
+  var navStack = [], histOK = false, popSkip = 0, baseY = 0;
+  try {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    // after a reload the sub-view entries of the old page are stale: step back over them once
+    var hs = history.state;
+    if (hs && hs.ll > 0) { popSkip++; history.go(-hs.ll); }
+  } catch (e) { /* ignore */ }
+  function topView() { return navStack[navStack.length - 1] || null; }
+  function pushView(v) {
+    flush();
+    var cur = topView();
+    if (cur) cur.y = window.scrollY; else baseY = window.scrollY;
+    navStack.push(v);
+    try { history.pushState({ ll: navStack.length }, ''); histOK = true; } catch (e) { /* the Back buttons still work */ }
+    render();
+    window.scrollTo(0, 0);
+  }
+  function afterPop() {
+    render();
+    var cur = topView();
+    window.scrollTo(0, (cur ? cur.y : baseY) || 0);
+  }
+  function backView() {
+    if (!navStack.length) return;
+    if (histOK) { try { history.back(); return; } catch (e) { /* fall through */ } }
+    navStack.pop();
+    afterPop();
+  }
+  window.addEventListener('popstate', function (ev) {
+    if (popSkip) { popSkip--; return; }
+    var depth = ev.state && ev.state.ll > 0 ? ev.state.ll : 0;
+    if (depth >= navStack.length) return;
+    flush();
+    navStack.length = depth;
+    afterPop();
+  });
+  function clearViews() {
+    if (!navStack.length) return;
+    var n = navStack.length;
+    navStack = [];
+    if (histOK) { popSkip++; try { history.go(-n); } catch (e) { popSkip--; } }
+  }
+  /* close the sub-view on top when what it shows no longer exists */
+  function dropTop() {
+    navStack.pop();
+    if (histOK) { popSkip++; try { history.back(); } catch (e) { popSkip--; } }
+    render();
+  }
+  function subnav(right) {
+    return h('div', { class: 'subnav' }, h('button', { type: 'button', class: 'btn small back', onclick: backView }, '‹ Back'), right || null);
+  }
+  function renderSub(top) {
+    if (top.v === 'plans') renderPlans();
+    else if (top.v === 'edit') renderEditor(top);
+    else if (top.v === 'lib') renderLibrary(top);
+    else renderExDetail(top);
+  }
+
+  var MUSCLE_NAMES = {};
+  MUSCLES.forEach(function (m) { MUSCLE_NAMES[m[0]] = m[1]; });
+  MUSCLE_NAMES.other = 'Other';
+  var EQUIPS = [['barbell', 'Barbell'], ['dumbbell', 'Dumbbell'], ['machine', 'Machine'], ['cable', 'Cable'], ['smith', 'Smith machine'],
+    ['bodyweight', 'Bodyweight'], ['other', 'Band, ball or plate']];
+  var EQ_NAMES = { barbell: 'Barbell', dumbbell: 'Dumbbell', machine: 'Machine', cable: 'Cable', smith: 'Smith machine', bodyweight: 'Bodyweight',
+    band: 'Band', ball: 'Ball', plate: 'Weight plate' };
+  function musclesText(c) { return (c.muscles || []).map(function (m) { return MUSCLE_NAMES[m] || m; }).join(', ') || 'Other'; }
+  function eqText(c) { return (c.eq || []).map(function (x) { return EQ_NAMES[x] || x; }).join(', '); }
+  function jefitUrl(name) { return 'https://www.google.com/search?q=' + encodeURIComponent('site:jefit.com/exercises ' + name); }
+  function jefitLink(name) {
+    return h('a', { class: 'btn small', href: jefitUrl(name), target: '_blank', rel: 'noopener noreferrer' }, 'Look it up on JEFIT ↗');
+  }
+  function creditEl(c) {
+    if (!c || !c.ek) return null;
+    return h('p', { class: 'credit' }, 'Drawing and instructions: ',
+      h('a', { href: EXL.source || 'https://github.com/everkinetic/data', target: '_blank', rel: 'noopener noreferrer' }, 'Everkinetic'),
+      ' by Greg Priday, ', h('a', { href: EXL.license || 'https://creativecommons.org/licenses/by-sa/4.0/', target: '_blank', rel: 'noopener noreferrer' }, 'CC BY-SA 4.0'),
+      '. Drawing adapted for Lift Log.');
+  }
+  function stepsEl(c) {
+    return c.steps && c.steps.length ? h('ol', { class: 'steps' }, c.steps.map(function (t) { return h('li', null, h('span', { text: t })); }))
+      : h('p', { class: 'subnote', text: 'No step-by-step instructions for this exercise yet. The JEFIT link below finds a demonstration.' });
+  }
+  function howPanel(e) {
+    var c = CAT[e.id] || { name: e.name };
+    return h('div', { class: 'howbox' },
+      stepsEl(c),
+      h('div', { class: 'acts' },
+        h('button', { type: 'button', class: 'btn small', text: 'All details', onclick: function () { pushView({ v: 'ex', id: e.id }); } }),
+        jefitLink(c.name)),
+      creditEl(c));
+  }
+
+  /* plan data */
+  function planDoc(pid) { return state.settings.plans[pid] || null; }
+  function planDayIds(p) { return (p.days || []).concat(p.removedDays || []).map(function (d) { return d.id; }); }
+  function planSessions(p) {
+    var ids = planDayIds(p);
+    return Object.keys(state.logs).filter(function (k) { var d = state.logs[k]; return d && ids.indexOf(d.day) >= 0; }).length;
+  }
+  function daySessions(dayId) { return Object.keys(state.logs).some(function (k) { var d = state.logs[k]; return d && d.day === dayId; }); }
+  function newDayObj(p) {
+    var used = p.days.map(function (d) { return d.tone; }), tone = 0;
+    while (used.indexOf(tone) >= 0 && tone < TONES - 1) tone++;
+    if (used.indexOf(tone) >= 0) tone = p.days.length % TONES;
+    return { id: uid('d'), label: 'Day ' + 'ABCDEFG'.charAt(Math.min(6, p.days.length)), tone: tone, slots: [] };
+  }
+  /* keep today's draft in step with plan edits without reloading it (a reload could drop the last unsaved keystrokes) */
+  function syncDraft() {
+    // the day on screen was just removed from the plan in use: go to that plan's next day
+    if (DAYS.indexOf(state.day) < 0 && PLAN[state.day] && PLAN[state.day].plan === activePlan().id) state.day = defaultDay();
+    var d = state.draft;
+    if (!d || d.day !== state.day || d.date !== state.date || !PLAN[d.day]) { flush(); reloadDraft(); return; }
+    d.plan = PLAN[d.day].plan || d.plan || null;
+    Object.keys(d.swaps || {}).forEach(function (k) { var sl = slotById(d.day, k); if (!sl || sl.alts.indexOf(d.swaps[k]) < 0) delete d.swaps[k]; });
+    PLAN[d.day].slots.forEach(function (sl) { var id = effId(d, sl); if (!d.entries[id]) d.entries[id] = blankSets(sl.sets); });
+  }
+  var planT = null;
+  function planChanged(p) {
+    clearTimeout(planT); planT = null;
+    if (p) p.updated = Date.now();
+    rebuildPlans();
+    syncDraft();
+    saveSettings();
+  }
+  function planChangedSoon(p) {
+    p.updated = Date.now();
+    clearTimeout(planT);
+    planT = setTimeout(function () { planChanged(p); }, 500);
+  }
+  function usePlan(pid) {
+    flush();
+    state.settings.activePlan = pid;
+    rebuildPlans();
+    saveSettings();
+    state.dayPicked = false;
+    state.day = defaultDay();
+    state.swapOpen = null;
+    reloadDraft();
+    render();
+  }
+  function newPlan() {
+    var n = customPlans().length;
+    var p = { id: uid('p'), name: n ? 'My plan ' + (n + 1) : 'My plan', created: Date.now(), updated: Date.now(), days: [] };
+    p.days.push(newDayObj(p));
+    state.settings.plans[p.id] = p;
+    planChanged(p);
+    pushView({ v: 'edit', id: p.id });
+  }
+  function duplicatePlan(src) {
+    var p = { id: uid('p'), name: (src.name + (src.builtin ? ' (my version)' : ' (copy)')).slice(0, 40), created: Date.now(), updated: Date.now(),
+      days: src.days.map(function (d, i) {
+        return { id: uid('d'), label: d.label, tone: d.tone != null ? d.tone % TONES : i % TONES,
+          slots: (d.slots || []).map(function (s) { return { id: s.id, sets: s.sets, lo: s.lo, hi: s.hi, rest: s.rest }; }) };
+      }) };
+    state.settings.plans[p.id] = p;
+    planChanged(p);
+    pushView({ v: 'edit', id: p.id });
+  }
+  function deletePlan(pid) {
+    var p = planDoc(pid);
+    if (!p) return;
+    // a plan you trained with is only hidden, so its sessions keep their day names in History
+    if (planSessions(p)) { p.archived = true; p.updated = Date.now(); }
+    else delete state.settings.plans[pid];
+    if (state.settings.activePlan === pid) { state.settings.activePlan = BUILTIN_ID; state.dayPicked = false; }
+    flush();
+    rebuildPlans();
+    saveSettings();
+    if (!state.dayPicked) state.day = defaultDay();
+    reloadDraft();
+    render();
+  }
+
+  /* plans list */
+  function renderPlans() {
+    var v = $('#view'), act = activePlan();
+    $('#ptitle').textContent = 'Plans';
+    $('#psub').textContent = 'Train with the built-in plan or one of your own';
+    v.className = 'view';
+    var cards = plansList().map(function (p) {
+      var on = p.id === act.id, confirming = state.confirmPlan === p.id;
+      var n = p.days.reduce(function (a, d) { return a + (d.slots || []).length; }, 0);
+      return h('section', { class: 'card plan' + (on ? ' on' : '') },
+        h('div', { class: 'phead' },
+          h('div', null, h('h3', { text: p.name }),
+            h('p', { class: 'target', text: p.days.length + (p.days.length === 1 ? ' day' : ' days') + ' · ' + n + (n === 1 ? ' exercise' : ' exercises') + (p.builtin ? ' · built in' : '') })),
+          on ? h('span', { class: 'tag t-good', text: 'In use' }) : null),
+        h('div', { class: 'pdays' }, p.days.map(function (d, i) {
+          return h('span', { class: 'pday tn' + ((d.tone != null ? d.tone : i) % TONES) }, h('i'), d.label || 'Day ' + (i + 1));
+        })),
+        h('div', { class: 'acts' },
+          on ? null : h('button', { type: 'button', class: 'btn small primary', text: 'Use this plan', onclick: function () { usePlan(p.id); } }),
+          p.builtin ? null : h('button', { type: 'button', class: 'btn small', text: 'Edit', onclick: function () { state.confirmPlan = null; pushView({ v: 'edit', id: p.id }); } }),
+          h('button', { type: 'button', class: 'btn small', text: p.builtin ? 'Copy and edit' : 'Duplicate', onclick: function () { state.confirmPlan = null; duplicatePlan(p); } }),
+          p.builtin ? null : h('button', { type: 'button', class: 'btn small danger', text: confirming ? 'Tap again to delete' : 'Delete', onclick: function () {
+            if (confirming) { state.confirmPlan = null; deletePlan(p.id); } else { state.confirmPlan = p.id; renderPlans(); }
+          } })),
+        confirming ? h('p', { class: 'subnote', text: planSessions(p) ? 'Sessions you logged with this plan stay in History and Progress.' : 'This plan has no logged sessions.' }) : null);
+    });
+    v.replaceChildren(
+      subnav(),
+      ...cards,
+      h('div', { class: 'acts' },
+        h('button', { type: 'button', class: 'btn primary', text: '+ New plan', onclick: newPlan }),
+        h('button', { type: 'button', class: 'btn', text: 'Browse exercises', onclick: function () { pushView({ v: 'lib' }); } })),
+      h('p', { class: 'subnote', text: 'Plans are saved and backed up with the rest of your data, and the watch follows the plan in use. Switching plans keeps your history: records and weight suggestions belong to each exercise, whatever plan it is in.' }));
+  }
+
+  /* plan editor: every change is saved straight away, like the rest of the app */
+  var REST_OPTS = [30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 300];
+  function moveItem(arr, i, d) { var j = i + d; if (j < 0 || j >= arr.length) return; var t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+  function slotEditor(p, d, s, si, top) {
+    var c = CAT[s.id] || { name: s.id };
+    function numIn(key, label, min, max) {
+      return h('input', { type: 'text', inputmode: 'numeric', value: String(s[key]), 'aria-label': c.name + ', ' + label, onchange: function (ev) {
+        var n = Math.round(num(ev.target.value));
+        if (!(n >= min)) n = key === 'sets' ? 3 : min;
+        s[key] = Math.min(max, n);
+        if (key === 'lo' && s.hi < s.lo) s.hi = s.lo;
+        if (key === 'hi' && s.lo > s.hi) s.lo = s.hi;
+        planChanged(p);
+        setTimeout(function () { if (topView() === top) renderEditor(top); }, 0);
+      } });
+    }
+    var rests = REST_OPTS.indexOf(s.rest) < 0 ? REST_OPTS.concat([s.rest]).sort(function (a, b) { return a - b; }) : REST_OPTS;
+    return h('div', { class: 'erow' },
+      picEl(s.id, null, true),
+      h('button', { type: 'button', class: 'nm', 'aria-label': c.name + ', show how to do it', onclick: function () { pushView({ v: 'ex', id: s.id }); } }, c.name),
+      h('div', { class: 'ebtns' },
+        h('button', { type: 'button', class: 'ib', 'aria-label': 'Move ' + c.name + ' up', disabled: si === 0, onclick: function () { moveItem(d.slots, si, -1); planChanged(p); renderEditor(top); } }, '↑'),
+        h('button', { type: 'button', class: 'ib', 'aria-label': 'Move ' + c.name + ' down', disabled: si === d.slots.length - 1, onclick: function () { moveItem(d.slots, si, 1); planChanged(p); renderEditor(top); } }, '↓'),
+        h('button', { type: 'button', class: 'ib x', 'aria-label': 'Remove ' + c.name, onclick: function () { d.slots.splice(si, 1); planChanged(p); renderEditor(top); } }, '✕')),
+      h('div', { class: 'nums' },
+        h('span', { class: 'grp' }, 'Sets', numIn('sets', 'sets', 1, 10)),
+        h('span', { class: 'grp' }, 'Reps', numIn('lo', 'fewest reps', 1, 50), '–', numIn('hi', 'most reps', 1, 50)),
+        h('span', { class: 'grp' }, 'Rest', h('select', { 'aria-label': c.name + ', rest between sets', onchange: function (ev) { s.rest = Number(ev.target.value); planChanged(p); } },
+          rests.map(function (r) { return h('option', { value: String(r), text: fmtClock(r), selected: r === s.rest }); })))));
+  }
+  function dayEditor(p, d, di, top) {
+    var confirming = state.confirmDay === d.id;
+    return h('section', { class: 'card eday tn' + (d.tone % TONES) },
+      h('div', { class: 'dhead' },
+        h('button', { type: 'button', class: 'tone', 'aria-label': 'Change the colour of ' + (d.label || 'this day'), onclick: function () { d.tone = (d.tone + 1) % TONES; planChanged(p); renderEditor(top); } }),
+        h('input', { type: 'text', class: 'dlabel', value: d.label, maxlength: 20, placeholder: 'Day name', 'aria-label': 'Day name', oninput: function (ev) { d.label = ev.target.value.slice(0, 20); planChangedSoon(p); },
+          onchange: function (ev) { if (!ev.target.value.trim()) { d.label = 'Day ' + (di + 1); ev.target.value = d.label; } planChanged(p); } }),
+        h('button', { type: 'button', class: 'ib', 'aria-label': 'Move day up', disabled: di === 0, onclick: function () { moveItem(p.days, di, -1); planChanged(p); renderEditor(top); } }, '↑'),
+        h('button', { type: 'button', class: 'ib', 'aria-label': 'Move day down', disabled: di === p.days.length - 1, onclick: function () { moveItem(p.days, di, 1); planChanged(p); renderEditor(top); } }, '↓')),
+      d.slots.length ? h('div', { class: 'elist' }, d.slots.map(function (s, si) { return slotEditor(p, d, s, si, top); }))
+        : h('p', { class: 'subnote', text: 'No exercises yet. Add some from the exercise library.' }),
+      h('div', { class: 'acts' },
+        d.slots.length < 20 ? h('button', { type: 'button', class: 'btn small primary', text: '+ Add exercises', onclick: function () { state.confirmDay = null; pushView({ v: 'lib', pick: { plan: p.id, day: d.id } }); } }) : null,
+        p.days.length > 1 ? h('button', { type: 'button', class: 'btn small danger', text: confirming ? 'Tap again to remove' : 'Remove day', onclick: function () {
+          if (!confirming) { state.confirmDay = d.id; renderEditor(top); return; }
+          state.confirmDay = null;
+          p.days.splice(di, 1);
+          if (daySessions(d.id)) (p.removedDays = p.removedDays || []).push(d);
+          planChanged(p);
+          renderEditor(top);
+        } }) : null));
+  }
+  function renderEditor(top) {
+    var p = planDoc(top.id), v = $('#view');
+    if (!p || p.archived) { dropTop(); return; }
+    var on = activePlan().id === p.id;
+    $('#ptitle').textContent = 'Edit plan';
+    $('#psub').textContent = 'Changes save as you go';
+    v.className = 'view';
+    v.replaceChildren(
+      subnav(on ? h('span', { class: 'tag t-good', text: 'In use' })
+        : h('button', { type: 'button', class: 'btn small primary', text: 'Use this plan', onclick: function () { usePlan(p.id); } })),
+      h('section', { class: 'panel' },
+        h('label', { class: 'lbl', for: 'pname' }, 'Plan name',
+          h('input', { type: 'text', class: 'pname', id: 'pname', value: p.name, maxlength: 40, oninput: function (ev) { p.name = ev.target.value.slice(0, 40); planChangedSoon(p); },
+            onchange: function (ev) { if (!ev.target.value.trim()) { p.name = 'My plan'; ev.target.value = p.name; } planChanged(p); } })),
+        h('p', { class: 'subnote', text: 'Tap the coloured square to change a day\'s colour. Tap an exercise name to see how it is done.' })),
+      ...p.days.map(function (d, di) { return dayEditor(p, d, di, top); }),
+      h('div', { class: 'acts' },
+        p.days.length < 7 ? h('button', { type: 'button', class: 'btn', text: '+ Add day', onclick: function () { p.days.push(newDayObj(p)); planChanged(p); renderEditor(top); } }) : null,
+        h('button', { type: 'button', class: 'btn primary', text: 'Done', onclick: function () { planChanged(p); backView(); } })));
+  }
+
+  /* exercise library (also the picker when adding exercises to a plan day) */
+  function pickTarget(top) {
+    var pk = top && top.pick, p = pk && planDoc(pk.plan);
+    var d = p && p.days.filter(function (x) { return x.id === pk.day; })[0];
+    return d ? { plan: p, day: d } : null;
+  }
+  function addToDay(t, id) {
+    if (t.day.slots.some(function (s) { return s.id === id; }) || t.day.slots.length >= 20) return;
+    var f = defaultsFor(CAT[id]);
+    t.day.slots.push({ id: id, sets: f.sets, lo: f.lo, hi: f.hi, rest: f.rest });
+    planChanged(t.plan);
+  }
+  function libFilter(id) {
+    var c = CAT[id], f = state.lib, m = c.muscles && c.muscles.length ? c.muscles : ['other'];
+    if (f.m !== 'all' && m.indexOf(f.m) < 0) return false;
+    if (f.eq !== 'all') {
+      var eq = (c.eq || []).map(function (x) { return /^(band|ball|plate)$/.test(x) ? 'other' : x; });
+      if (eq.indexOf(f.eq) < 0) return false;
+    }
+    var q = f.q.trim().toLowerCase();
+    if (q) {
+      var name = c.name.toLowerCase();
+      if (!q.split(/\s+/).every(function (w) { return name.indexOf(w) >= 0; })) return false;
+    }
+    return true;
+  }
+  function activeIds() {
+    var o = {};
+    DAYS.forEach(function (d) { PLAN[d].slots.forEach(function (s) { o[s.id] = 1; }); });
+    return o;
+  }
+  function libRow(id, t, top, mine) {
+    var c = CAT[id], inDay = t && t.day.slots.some(function (s) { return s.id === id; });
+    var row = h('div', { class: 'lrow' },
+      h('button', { type: 'button', class: 'lopen', onclick: function () { pushView({ v: 'ex', id: id, pick: top.pick || null }); } },
+        picEl(id, null, true),
+        h('span', { class: 'lt' },
+          mine && mine[id] ? h('span', { class: 'yours', text: 'In your plan' }) : null,
+          h('span', { class: 'ln', text: c.name }),
+          h('span', { class: 'lm', text: musclesText(c) + ' · ' + eqText(c) }))),
+      t ? h('button', { type: 'button', class: 'btn small' + (inDay ? '' : ' primary'), disabled: inDay || t.day.slots.length >= 20, text: inDay ? 'Added ✓' : 'Add', onclick: function () {
+        addToDay(t, id);
+        row.replaceWith(libRow(id, t, top, mine));
+        $('#psub').textContent = libSub(t);
+      } }) : null);
+    return row;
+  }
+  function libSub(t) {
+    return t ? 'To ' + (t.day.label || 'this day') + ' · ' + t.day.slots.length + (t.day.slots.length === 1 ? ' exercise' : ' exercises')
+      : LIB_IDS.length + ' exercises · search or filter by muscle and equipment';
+  }
+  function chipRow(items, cur, label, onpick) {
+    var row = h('div', { class: 'chips', role: 'group', 'aria-label': label });
+    items.forEach(function (it) {
+      row.append(h('button', { type: 'button', 'aria-pressed': String(it[0] === cur), text: it[1], onclick: function (ev) {
+        row.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+        ev.currentTarget.setAttribute('aria-pressed', 'true');
+        onpick(it[0]);
+      } }));
+    });
+    return row;
+  }
+  function renderLibrary(top) {
+    var v = $('#view'), t = pickTarget(top), f = state.lib;
+    if (top.pick && !t) { dropTop(); return; }
+    $('#ptitle').textContent = t ? 'Add exercises' : 'Exercises';
+    $('#psub').textContent = libSub(t);
+    v.className = 'view' + (t ? ' tn' + (t.day.tone % TONES) : '');
+    var count = h('p', { class: 'sub', 'aria-live': 'polite' }), list = h('div', { class: 'lib' }), mine = activeIds();
+    function fill() {
+      var ids = LIB_IDS.filter(libFilter);
+      count.textContent = ids.length + (ids.length === 1 ? ' exercise' : ' exercises');
+      list.replaceChildren(...ids.map(function (id) { return libRow(id, t, top, mine); }));
+      if (!ids.length) list.append(h('p', { class: 'muted', text: 'Nothing matches. Try another word or clear a filter.' }));
+    }
+    var muscles = MUSCLES.filter(function (m) { return LIB_IDS.some(function (id) { return CAT[id].muscles.indexOf(m[0]) >= 0; }); });
+    v.replaceChildren(
+      subnav(t ? h('button', { type: 'button', class: 'btn small primary', text: 'Done', onclick: backView }) : null),
+      h('div', { class: 'libtools' },
+        h('input', { type: 'search', class: 'search', placeholder: 'Search, e.g. "row" or "cable curl"', value: f.q, 'aria-label': 'Search exercises', oninput: function (ev) { f.q = ev.target.value; fill(); } }),
+        chipRow([['all', 'All muscles']].concat(muscles).concat([['other', 'Other']]), f.m, 'Muscle', function (k) { f.m = k; fill(); }),
+        chipRow([['all', 'All equipment']].concat(EQUIPS), f.eq, 'Equipment', function (k) { f.eq = k; fill(); })),
+      count,
+      list,
+      h('p', { class: 'credit' }, 'Most drawings and instructions: ',
+        h('a', { href: EXL.source || 'https://github.com/everkinetic/data', target: '_blank', rel: 'noopener noreferrer' }, 'Everkinetic'),
+        ' by Greg Priday, ', h('a', { href: EXL.license || 'https://creativecommons.org/licenses/by-sa/4.0/', target: '_blank', rel: 'noopener noreferrer' }, 'CC BY-SA 4.0'),
+        ', adapted for Lift Log. Each exercise links to a JEFIT search for more pictures and videos.'));
+    fill();
+  }
+
+  /* one exercise: drawing, steps, your numbers, where it is used */
+  function renderExDetail(top) {
+    var id = top.id, c = CAT[id], v = $('#view'), t = pickTarget(top);
+    if (!c) { dropTop(); return; }
+    $('#ptitle').textContent = c.name;
+    $('#psub').textContent = musclesText(c) + ' · ' + eqText(c);
+    v.className = 'view ' + (t ? 'tn' + (t.day.tone % TONES) : EXMAP[id] ? dc(EXMAP[id].day) : 'tn0');
+    var hero = c.img
+      ? h('div', { class: 'exhero' },
+          h('figure', null, h('img', { src: c.img, alt: c.name + ', start position' }), h('figcaption', { text: 'Start' })),
+          h('figure', { class: 'end' }, h('img', { src: c.img, alt: c.name + ', end position' }), h('figcaption', { text: 'Finish' })))
+      : h('div', { class: 'exhero one' }, picEl(id, null, false));
+    var hist = historyFor(id, '9999-12-31'), mine = null;
+    if (hist.length) {
+      var b = bestBefore(id, '9999-12-31');
+      mine = h('section', { class: 'panel' }, h('h2', { text: 'Your numbers' }),
+        h('div', { class: 'tiles' },
+          tile('Sessions', String(hist.length), ''),
+          b.e1 > 0 ? tile('Best est. 1RM', fmt(b.e1), 'kg') : tile('Best reps', String(b.reps), ''),
+          tile('Last', fmtShort(hist[0].date), '')),
+        h('p', { class: 'last' }, h('span', { text: 'Last time:' }), h('span', { class: 'vals', text: setText(hist[0].sets, c.bw) })));
+    }
+    var used = [];
+    plansList().forEach(function (p) {
+      p.days.forEach(function (d) { if ((d.slots || []).some(function (s) { return s.id === id; })) used.push(p.name + ' · ' + d.label); });
+    });
+    var inDay = t && t.day.slots.some(function (s) { return s.id === id; });
+    v.replaceChildren(
+      subnav(t ? h('button', { type: 'button', class: 'btn small primary', disabled: inDay, text: inDay ? 'Added ✓' : 'Add to ' + (t.day.label || 'day'), onclick: function () {
+        addToDay(t, id); backView();
+      } }) : null),
+      hero,
+      h('div', { class: 'facts' },
+        (c.muscles || []).map(function (m) { return h('span', { class: 'tag t-plain', text: MUSCLE_NAMES[m] || m }); }),
+        (c.eq || []).map(function (x) { return h('span', { class: 'tag t-info', text: EQ_NAMES[x] || x }); }),
+        c.type ? h('span', { class: 'tag t-plain', text: c.type === 'compound' ? 'Compound' : 'Isolation' }) : null),
+      h('section', { class: 'panel' }, h('h2', { text: 'How to do it' }), stepsEl(c),
+        c.tips && c.tips.length ? h('ul', { class: 'tips' }, c.tips.map(function (x) { return h('li', { text: x }); })) : null,
+        h('div', { class: 'acts' }, jefitLink(c.name)),
+        creditEl(c)),
+      mine,
+      used.length ? h('section', { class: 'panel' }, h('h2', { text: 'In your plans' }), h('div', { class: 'pdays' }, used.map(function (u) { return h('span', { class: 'pday', text: u }); }))) : null);
+  }
+
   /* ---------- wiring ---------- */
   document.querySelectorAll('.tabs [data-tab]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
   $('#fab').addEventListener('click', function () {
     var a = activeSession();
     if (a) {
-      if (!a.isDraft && a.doc) { flush(); state.day = a.doc.day; state.date = a.doc.date; reloadDraft(); }
+      if (!a.isDraft && a.doc) { flush(); state.day = a.doc.day; state.dayPicked = true; state.date = a.doc.date; reloadDraft(); }
       setTab('log');
       return;
     }
     flush();
-    if (state.date !== todayISO()) { state.date = todayISO(); state.day = defaultDay(); reloadDraft(); }
+    if (state.date !== todayISO()) { state.date = todayISO(); state.dayPicked = false; state.day = defaultDay(); reloadDraft(); }
     setTab('log');
     if (!state.draft.endedAt) startWorkout();
     window.scrollTo(0, 0);
