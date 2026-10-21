@@ -5,7 +5,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.Sensor;
@@ -23,6 +26,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -72,12 +76,16 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
 
     static final String[] DAYS = {"push", "pull", "legs", "upper"};
     static final String[] LABELS = {"Push", "Pull", "Legs", "Upper"};
-    static final int[] COLORS = {0xFFEF5A4D, 0xFF5B8FE0, 0xFFF0B90B, 0xFF3FB868};
-    static final int ON_COLOR = 0xFF0F1217;
-    static final int GREY = 0xFF262B33;
-    static final int MUTED = 0xFF9AA3B0;
-    static final int WHITE = 0xFFECEFF4;
-    static final int GOOD = 0xFF3FB868;
+    // same palette as the phone app: navy surfaces, one colour per training day
+    static final int[] COLORS = {0xFF8B7CF8, 0xFF5B8DEF, 0xFFF5A524, 0xFF42B986};
+    static final int[] COLORS_HI = {0xFFB6AAFF, 0xFF93B4FA, 0xFFFFCD70, 0xFF7FDCB1};
+    static final int[] ON_DAY = {0xFFFFFFFF, 0xFFFFFFFF, 0xFF1E1404, 0xFF05170E};
+    static final int BG = 0xFF0B0E1A;
+    static final int GREY = 0xFF1B2034;
+    static final int SURFACE2 = 0xFF262C45;
+    static final int MUTED = 0xFF8B91AA;
+    static final int WHITE = 0xFFF2F3F9;
+    static final int GOOD = 0xFF7FE0B2;
     static final int REQ_BODY_SENSORS = 7;
 
     /** Built-in plan, used until the phone app has sent its own (which includes your swaps). */
@@ -118,6 +126,38 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             new Ex("hanging-leg", "Hanging Leg Raise", 3, 10, 15, 60, true, 2.5)
         }
     };
+    /** Circular progress ring used for the rest countdown. */
+    static final class RingView extends View {
+        private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF box = new RectF();
+        private float progress = 1f;
+
+        RingView(Context c, int color, float stroke) {
+            super(c);
+            track.setStyle(Paint.Style.STROKE);
+            track.setStrokeWidth(stroke);
+            track.setColor(SURFACE2);
+            arc.setStyle(Paint.Style.STROKE);
+            arc.setStrokeWidth(stroke);
+            arc.setStrokeCap(Paint.Cap.ROUND);
+            arc.setColor(color);
+        }
+
+        void setProgress(float p) {
+            progress = Math.max(0f, Math.min(1f, p));
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            float half = arc.getStrokeWidth() / 2f;
+            box.set(half, half, getWidth() - half, getHeight() - half);
+            canvas.drawArc(box, 0, 360, false, track);
+            if (progress > 0) canvas.drawArc(box, -90, 360 * progress, false, arc);
+        }
+    }
+
     static final Map<String, Ex> BUILTIN = new HashMap<>();
     static {
         for (Ex[] day : PLAN) for (Ex e : day) BUILTIN.put(e.id, e);
@@ -146,6 +186,8 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     private String recordText;
     private boolean confirmFinish;
     private TextView statusTv, restTv, weightTv, repsTv;
+    private RingView restRing;
+    private int restTotal = 1;
     private float density;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -714,6 +756,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             return;
         }
         restEnd = System.currentTimeMillis() + rest * 1000L;
+        restTotal = Math.max(1, rest);
         screen = "rest";
         render();
     }
@@ -755,6 +798,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
                 render();
             } else if (restTv != null) {
                 restTv.setText(clock((rem + 999) / 1000));
+                if (restRing != null) restRing.setProgress(rem / (restTotal * 1000f));
             }
         }
     }
@@ -811,19 +855,57 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         TextView b = text(s, 15, fg, true);
         GradientDrawable d = new GradientDrawable();
         d.setColor(bg);
-        d.setCornerRadius(dp(24));
+        d.setCornerRadius(dp(26));
         b.setBackground(d);
         b.setMinHeight(dp(46));
-        b.setPadding(dp(10), dp(8), dp(10), dp(8));
+        b.setPadding(dp(12), dp(8), dp(12), dp(8));
         b.setOnClickListener(l);
         return b;
+    }
+
+    /** Gradient pill in a day's colour, like the phone app's main buttons. */
+    private TextView primary(String s, int d, View.OnClickListener l) {
+        TextView b = button(s, COLORS[d], ON_DAY[d], l);
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{COLORS_HI[d], COLORS[d]});
+        g.setCornerRadius(dp(26));
+        b.setBackground(g);
+        return b;
+    }
+
+    /** Rounded navy card that groups related text. */
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(GREY);
+        d.setCornerRadius(dp(22));
+        c.setBackground(d);
+        c.setPadding(dp(12), dp(10), dp(12), dp(10));
+        return c;
+    }
+
+    private TextView pill(String s, int fg) {
+        TextView t = text(s, 12, fg, true);
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(GREY);
+        d.setCornerRadius(dp(14));
+        t.setBackground(d);
+        t.setPadding(dp(12), dp(4), dp(12), dp(4));
+        return t;
+    }
+
+    private LinearLayout.LayoutParams wrap(int topDp) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        p.topMargin = dp(topDp);
+        return p;
     }
 
     private TextView round(String s, View.OnClickListener l, View.OnLongClickListener longL) {
         TextView b = text(s, 22, WHITE, true);
         GradientDrawable d = new GradientDrawable();
-        d.setShape(GradientDrawable.OVAL);
-        d.setColor(GREY);
+        d.setColor(SURFACE2);
+        d.setCornerRadius(dp(15));
         b.setBackground(d);
         b.setOnClickListener(l);
         if (longL != null) b.setOnLongClickListener(longL);
@@ -856,15 +938,15 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         mid.setGravity(Gravity.CENTER);
         mid.addView(value);
         mid.addView(text(unit, 11, MUTED, false));
-        row.addView(m, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        row.addView(m, new LinearLayout.LayoutParams(dp(46), dp(46)));
         row.addView(mid, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        row.addView(p, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        row.addView(p, new LinearLayout.LayoutParams(dp(46), dp(46)));
         return row;
     }
 
     private void show(LinearLayout content) {
         ScrollView sv = new ScrollView(this);
-        sv.setBackgroundColor(Color.BLACK);
+        sv.setBackgroundColor(BG);
         sv.setFillViewport(true);
         sv.setVerticalScrollBarEnabled(false);
         sv.addView(content);
@@ -875,6 +957,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     private void render() {
         statusTv = null;
         restTv = null;
+        restRing = null;
         if (isRunning()) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if ("workout".equals(screen) && sid != null) showWorkout();
@@ -886,28 +969,47 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     private void showHome() {
         screen = "home";
         LinearLayout c = column();
-        c.addView(text("LIFT LOG", 18, WHITE, true));
+        LinearLayout brand = new LinearLayout(this);
+        brand.setOrientation(LinearLayout.HORIZONTAL);
+        brand.setGravity(Gravity.CENTER);
+        TextView logo = text("●", 10, COLORS[0], true);
+        brand.addView(logo);
+        TextView name = text("  LIFT LOG", 12, MUTED, true);
+        name.setLetterSpacing(0.12f);
+        brand.addView(name);
+        c.addView(brand);
         boolean running = isRunning();
+        c.addView(text(running ? "Keep going" : "Ready to train?", 19, WHITE, true), full(4));
         if (running) {
-            c.addView(button("Continue " + LABELS[day], COLORS[day], ON_COLOR, v -> {
+            LinearLayout live = card();
+            live.addView(text(LABELS[day] + " in progress", 13, COLORS_HI[day], true));
+            statusTv = text(clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel(), 22, WHITE, true);
+            live.addView(statusTv, full(2));
+            c.addView(live, full(10));
+            c.addView(primary("Continue", day, v -> {
                 screen = "workout";
                 exIdx = firstOpenExercise();
                 editKey = null;
                 render();
-            }), full(10));
-            statusTv = text(clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel(), 13, COLORS[day], true);
-            c.addView(statusTv, full(4));
+            }), full(8));
         }
-        c.addView(text(running ? "Or start another day" : "Start a workout", 12, MUTED, false), full(12));
+        c.addView(text(running ? "Or start another day" : "Pick today's session", 12, MUTED, false), full(12));
         int sug = suggestedDay();
         for (int i = 0; i < 4; i++) {
             final int d = i;
-            String label = LABELS[i] + (i == sug ? " · today" : "");
-            c.addView(button(label, running ? GREY : COLORS[i], running ? WHITE : ON_COLOR, v -> startSession(d)), full(8));
+            if (!running && i == sug) {
+                c.addView(primary(LABELS[i] + "  ·  today", i, v -> startSession(d)), full(8));
+            } else {
+                TextView b = button("●  " + LABELS[i], GREY, WHITE, v -> startSession(d));
+                android.text.SpannableString sp = new android.text.SpannableString("●  " + LABELS[i]);
+                sp.setSpan(new android.text.style.ForegroundColorSpan(COLORS[i]), 0, 1, 0);
+                b.setText(sp);
+                c.addView(b, full(8));
+            }
         }
         long ts = phone.optLong("ts", 0);
         String sync = ts == 0 ? "Open Lift Log on your phone once to sync"
-            : "Phone data from " + new SimpleDateFormat("d MMM HH:mm", Locale.UK).format(new Date(ts));
+            : "Synced " + new SimpleDateFormat("d MMM HH:mm", Locale.UK).format(new Date(ts));
         c.addView(text(sync, 11, MUTED, false), full(12));
         if (hrSensor != null && !hrGranted()) {
             c.addView(text("Heart rate is off. Start a workout and allow body sensors to see it.", 11, MUTED, false), full(6));
@@ -937,30 +1039,34 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             if (sr != null && sr.length() > 0) curR = sr.optInt(Math.min(si, sr.length() - 1), e.lo);
             else curR = same != null && same[1] > 0 ? (int) same[1] : e.lo;
         }
-        int col = COLORS[day];
+        int col = COLORS_HI[day];
         LinearLayout c = column();
-        statusTv = text(isRunning() ? clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel() : "Finished", 13, col, true);
-        c.addView(statusTv);
-        c.addView(text((exIdx + 1) + "/" + p.length + " · " + e.name, 16, WHITE, true), full(4));
-        String setLine = si < e.sets ? "Set " + (si + 1) + " of " + e.sets : "Extra set " + (si + 1);
-        c.addView(text(setLine + " · " + e.lo + "–" + e.hi + " reps", 12, MUTED, false), full(2));
+        statusTv = pill(isRunning() ? clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel() : "Finished", col);
+        c.addView(statusTv, wrap(0));
+
+        LinearLayout info = card();
+        info.addView(text((exIdx + 1) + " of " + p.length, 11, col, true));
+        info.addView(text(e.name, 16, WHITE, true), full(2));
+        String setLine = si < e.sets ? "Set " + (si + 1) + "/" + e.sets : "Extra set " + (si + 1);
+        info.addView(text(setLine + "  ·  " + e.lo + "–" + e.hi + " reps", 12, MUTED, false), full(2));
         if (sg != null && !kindLabel(sg.optString("kind")).isEmpty()) {
-            c.addView(text(kindLabel(sg.optString("kind")), 12, col, true), full(2));
+            info.addView(text(kindLabel(sg.optString("kind")), 12, col, true), full(2));
         }
-        if (!last.isEmpty()) c.addView(text("Last: " + setsText(last, e.bw), 12, MUTED, false), full(2));
-        if (allDone()) c.addView(text("All sets done. Finish when ready.", 12, col, true), full(4));
+        if (!last.isEmpty()) info.addView(text("Last: " + setsText(last, e.bw), 11, MUTED, false), full(2));
+        c.addView(info, full(8));
+        if (allDone()) c.addView(text("All sets done. Finish when ready.", 12, GOOD, true), full(6));
 
         final double step = e.inc > 0 ? e.inc : 2.5;
         weightTv = text(kg(curW), 28, WHITE, true);
-        c.addView(stepper(weightTv, (e.bw ? "+kg" : "kg") + " (hold ±" + kg(step * 4) + ")",
-            () -> setW(curW - step), () -> setW(curW + step), () -> setW(curW - step * 4), () -> setW(curW + step * 4)), full(8));
+        c.addView(stepper(weightTv, (e.bw ? "+kg" : "kg") + "  ·  hold ±" + kg(step * 4),
+            () -> setW(curW - step), () -> setW(curW + step), () -> setW(curW - step * 4), () -> setW(curW + step * 4)), full(10));
         repsTv = text(String.valueOf(curR), 28, WHITE, true);
         c.addView(stepper(repsTv, "reps",
             () -> setR(curR - 1), () -> setR(curR + 1), () -> setR(curR - 5), () -> setR(curR + 5)), full(6));
 
-        c.addView(button("Save set", col, ON_COLOR, v -> saveSet()), full(10));
+        c.addView(primary("Save set", day, v -> saveSet()), full(12));
         String done = setsText(ss, e.bw);
-        if (!done.isEmpty()) c.addView(text("Done: " + done, 12, MUTED, false), full(6));
+        if (!done.isEmpty()) c.addView(text("Done: " + done, 12, MUTED, false), full(8));
 
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
@@ -989,9 +1095,9 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
                         }
                     }, 3000);
                 }
-            }), full(10));
+            }), full(8));
         }
-        c.addView(button("Home", Color.BLACK, MUTED, v -> { screen = "home"; render(); }), full(4));
+        c.addView(button("Home", BG, MUTED, v -> { screen = "home"; render(); }), full(4));
         show(c);
     }
 
@@ -1006,38 +1112,51 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     }
 
     private void showRest() {
-        int col = COLORS[day];
+        int col = COLORS_HI[day];
         Ex[] p = plan();
         Ex next = p[Math.min(exIdx, p.length - 1)];
         int si = nextSet(next);
         LinearLayout c = column();
-        if (recordText != null) c.addView(text(recordText, 13, GOOD, true));
-        c.addView(text("REST", 15, col, true), full(recordText != null ? 4 : 0));
-        restTv = text(clock(Math.max(0, (restEnd - System.currentTimeMillis() + 999) / 1000)), 46, WHITE, true);
-        c.addView(restTv, full(2));
-        c.addView(text("Next: " + next.name + " · set " + (si + 1), 12, MUTED, false), full(4));
+        if (recordText != null) c.addView(pill(recordText, GOOD), wrap(0));
+        FrameLayout dial = new FrameLayout(this);
+        long rem = Math.max(0, restEnd - System.currentTimeMillis());
+        restRing = new RingView(this, col, dp(9));
+        restRing.setProgress(rem / (restTotal * 1000f));
+        dial.addView(restRing, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout mid = new LinearLayout(this);
+        mid.setOrientation(LinearLayout.VERTICAL);
+        mid.setGravity(Gravity.CENTER);
+        TextView lbl = text("REST", 11, col, true);
+        lbl.setLetterSpacing(0.15f);
+        mid.addView(lbl);
+        restTv = text(clock((rem + 999) / 1000), 38, WHITE, true);
+        mid.addView(restTv);
+        statusTv = text(clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel(), 11, MUTED, false);
+        mid.addView(statusTv);
+        dial.addView(mid, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout.LayoutParams dp0 = new LinearLayout.LayoutParams(dp(150), dp(150));
+        dp0.topMargin = dp(recordText != null ? 8 : 0);
+        c.addView(dial, dp0);
+        c.addView(text("Next: " + next.name + " · set " + (si + 1), 12, MUTED, false), full(8));
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         lp.rightMargin = dp(4);
-        row.addView(button("−15s", GREY, WHITE, v -> restEnd -= 15000), lp);
+        row.addView(button("−15s", GREY, WHITE, v -> { restEnd -= 15000; restTotal = Math.max(1, restTotal - 15); }), lp);
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         rp.leftMargin = dp(4);
-        row.addView(button("+15s", GREY, WHITE, v -> restEnd += 15000), rp);
+        row.addView(button("+15s", GREY, WHITE, v -> { restEnd += 15000; restTotal += 15; }), rp);
         c.addView(row, full(10));
-        c.addView(button("Skip rest", col, ON_COLOR, v -> {
+        c.addView(primary("Skip rest", day, v -> {
             restEnd = 0;
             recordText = null;
             screen = "workout";
             render();
         }), full(8));
-        statusTv = text(clock((System.currentTimeMillis() - startedAt) / 1000) + hrLabel(), 12, MUTED, false);
-        c.addView(statusTv, full(8));
         show(c);
     }
 
     private void showDone() {
-        int col = COLORS[day];
         int sets = 0;
         double vol = 0;
         for (Ex e : plan()) {
@@ -1049,12 +1168,14 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             }
         }
         LinearLayout c = column();
-        c.addView(text("WORKOUT DONE", 15, col, true));
-        c.addView(text(clock(Math.max(0, (endedAt - startedAt) / 1000)), 40, WHITE, true), full(4));
-        c.addView(text(LABELS[day] + " · " + sets + " sets · " + Math.round(vol) + " kg", 12, MUTED, false), full(4));
-        if (hrCount > 0) c.addView(text("♥ avg " + hrAvg() + " · max " + hrMax + " bpm", 12, MUTED, false), full(4));
-        c.addView(text("Sent to your phone. It updates next time you open Lift Log there.", 11, MUTED, false), full(8));
-        c.addView(button("Done", col, ON_COLOR, v -> {
+        c.addView(pill("WORKOUT DONE", COLORS_HI[day]), wrap(0));
+        LinearLayout sum = card();
+        sum.addView(text(clock(Math.max(0, (endedAt - startedAt) / 1000)), 36, WHITE, true));
+        sum.addView(text(LABELS[day] + " · " + sets + " sets · " + Math.round(vol) + " kg", 12, MUTED, false), full(2));
+        if (hrCount > 0) sum.addView(text("♥ avg " + hrAvg() + " · max " + hrMax + " bpm", 12, COLORS_HI[day], true), full(4));
+        c.addView(sum, full(10));
+        c.addView(text("Sent to your phone. It updates next time you open Lift Log there.", 11, MUTED, false), full(10));
+        c.addView(primary("Done", day, v -> {
             screen = "home";
             render();
         }), full(10));
