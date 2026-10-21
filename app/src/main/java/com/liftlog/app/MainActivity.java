@@ -22,6 +22,8 @@ public class MainActivity extends Activity {
     private static final int REQ_FILE = 41;
     private static final int REQ_HEALTH = 42;
     private static final int REQ_OCR = 43;
+    private static final int REQ_RESTORE = 44;
+    private static final int REQ_BACKUP_TO = 45;
 
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
@@ -30,6 +32,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DataStore.init(this);
         web = new WebView(this);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -84,6 +87,8 @@ public class MainActivity extends Activity {
         if (WatchSync.active == this) WatchSync.active = null;
         // Let the page save anything still pending before Android may stop the app.
         web.evaluateJavascript("document.dispatchEvent(new Event('visibilitychange'))", null);
+        // and copy the latest data to the backup file a moment later
+        web.postDelayed(DataStore::flush, 700);
         super.onPause();
     }
 
@@ -105,6 +110,32 @@ public class MainActivity extends Activity {
             Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
             if (uri == null) deliverOcr("{\"status\":\"cancelled\"}");
             else ReportOcr.read(this, uri, this::deliverOcr);
+        } else if (requestCode == REQ_RESTORE) {
+            Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+            if (uri == null) {
+                deliverRestore("{\"status\":\"cancelled\"}");
+                return;
+            }
+            boolean canWrite = keepAccess(uri);
+            DataStore.runInBackground(() -> {
+                try {
+                    String text = DataStore.read(uri);
+                    // keep backing up into the file you restored from, so there is only one backup file
+                    if (canWrite && DataStore.hasData(text)) DataStore.useFile(uri, "the file you restored from");
+                    deliverRestore(text);
+                } catch (Exception e) {
+                    deliverRestore(errorJson(e));
+                }
+            });
+        } else if (requestCode == REQ_BACKUP_TO) {
+            Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+            if (uri == null) return;
+            if (!keepAccess(uri)) {
+                deliverBackup("{\"error\":\"Lift Log was not allowed to write to that place. Try another location.\"}");
+                return;
+            }
+            DataStore.useFile(uri, "the place you chose");
+            DataStore.runInBackground(() -> deliverBackup(DataStore.writeBackup(true)));
         } else if (requestCode == REQ_HEALTH) {
             // Read again: if permission was granted the data comes back, otherwise the page shows why not.
             HealthBridge.read(this, healthDays, this::deliverHealth);
@@ -115,6 +146,40 @@ public class MainActivity extends Activity {
     private void deliverHealth(String json) {
         runOnUiThread(() -> web.evaluateJavascript(
             "window.liftlogHealth && window.liftlogHealth(" + JSONObject.quote(json) + ")", null));
+    }
+
+    /** Keep read and write access to a file you picked, across restarts. Returns true if writing is allowed. */
+    private boolean keepAccess(Uri uri) {
+        try {
+            getContentResolver().takePersistableUriPermission(uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            return true;
+        } catch (Exception e) {
+            try {
+                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception ignored) {
+                // reading still works for this session
+            }
+            return false;
+        }
+    }
+
+    private static String errorJson(Exception e) {
+        try {
+            return new JSONObject().put("status", "error").put("message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()).toString();
+        } catch (JSONException x) {
+            return "{\"status\":\"error\"}";
+        }
+    }
+
+    private void deliverRestore(String text) {
+        runOnUiThread(() -> web.evaluateJavascript(
+            "window.liftlogRestore && window.liftlogRestore(" + JSONObject.quote(text) + ")", null));
+    }
+
+    private void deliverBackup(String json) {
+        runOnUiThread(() -> web.evaluateJavascript(
+            "window.liftlogBackupStatus && window.liftlogBackupStatus(" + JSONObject.quote(json) + ")", null));
     }
 
     /** Hand the text read from a report image to the page as a JSON string. */
@@ -194,6 +259,66 @@ public class MainActivity extends Activity {
                         deliverHealth(json);
                     }
                 });
+            });
+        }
+
+        // ---- data store and backup file ----
+
+        @JavascriptInterface
+        public String storeLoad() {
+            return DataStore.load();
+        }
+
+        @JavascriptInterface
+        public boolean storeSave(String json) {
+            return DataStore.save(json);
+        }
+
+        @JavascriptInterface
+        public String backupStatus() {
+            return DataStore.status();
+        }
+
+        @JavascriptInterface
+        public String backupReadKnown() {
+            return DataStore.readKnown();
+        }
+
+        @JavascriptInterface
+        public void backupNow() {
+            DataStore.runInBackground(() -> deliverBackup(DataStore.writeBackup(true)));
+        }
+
+        @JavascriptInterface
+        public void backupRestore() {
+            runOnUiThread(() -> {
+                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("*/*");
+                pick.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                try {
+                    startActivityForResult(pick, REQ_RESTORE);
+                } catch (ActivityNotFoundException e) {
+                    deliverRestore("{\"status\":\"error\",\"message\":\"no app to pick files\"}");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void backupChoose() {
+            runOnUiThread(() -> {
+                Intent create = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                create.addCategory(Intent.CATEGORY_OPENABLE);
+                create.setType("application/json");
+                create.putExtra(Intent.EXTRA_TITLE, DataStore.BACKUP_NAME);
+                create.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                try {
+                    startActivityForResult(create, REQ_BACKUP_TO);
+                } catch (ActivityNotFoundException e) {
+                    deliverBackup("{\"error\":\"No app on this phone can choose a location.\"}");
+                }
             });
         }
 

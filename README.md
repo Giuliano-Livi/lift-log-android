@@ -38,7 +38,14 @@ The Body tab tracks weight, body fat and tape measurements. Data comes in three 
 - Vibration when rest is over (plus a beep if sound is on).
 - History > Export CSV opens Android's share sheet (Drive, email, WhatsApp...).
 
-Uninstalling the app deletes its logs, so export a CSV first.
+## Your data
+- The app keeps everything in its own files (`liftlog-data.json`), written atomically on each save.
+  Installing a new version over the app keeps it.
+- A copy is written automatically, a few seconds after each change, to
+  `Download/LiftLog/LiftLog-backup.json` (or a place you choose, such as Google Drive). It survives
+  uninstalling the app. After a reinstall, the Workout tab offers "Restore from backup file".
+- History > Your data shows when the last backup was made and lets you restore, back up now or move
+  the backup. The web version can export and import the same file.
 
 ## Changing the page
 Edit `web/lift-log.html`, then `python3 tools/build_page.py` regenerates

@@ -358,6 +358,12 @@ details.sess .body { padding: 0 16px 16px; display: grid; gap: 10px; }
 .brow .btn { background: var(--surface3); }
 details.paste summary { cursor: pointer; font-size: 13.5px; color: var(--muted); min-height: 34px; display: flex; align-items: center; }
 #reportPanel { scroll-margin-top: 150px; }
+#dataPanel { scroll-margin-top: 16px; }
+.bkstat { display: flex; gap: 10px; align-items: center; background: var(--surface2); border-radius: 14px; padding: 12px 14px; font-size: 13px; }
+.bkstat .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.bkstat.ok .dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
+.bkstat.bad { color: #ff9aac; }
+.bkstat.bad .dot { background: var(--bad); }
 input[type="file"] { font-size: 13px; color: var(--muted); max-width: 100%; }
 input[type="file"]::file-selector-button { border: 0; border-radius: 99px; background: var(--surface3); color: var(--ink); padding: 8px 14px; margin-right: 10px; font: 500 13px var(--f-body); }
 
@@ -685,7 +691,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     week: weekStartOf(todayISO()), bmetric: 'weight', bform: null, confirmDel: null, confirmBody: null,
     settings: { rest: {}, swaps: {}, deloads: [] },
     restT: null, autoRest: true, sound: true, confirmReset: false, swapOpen: null, swapAlways: false,
-    healthMsg: '', healthSilent: false, importMsg: '', report: null, reportMsg: '', vision: null
+    healthMsg: '', healthSilent: false, importMsg: '', report: null, reportMsg: '', vision: null,
+    loaded: false, dataMsg: '', backup: null
   };
   function applySettings(v) {
     if (!v || typeof v !== 'object') return;
@@ -970,17 +977,129 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         h('button', { type: 'button', class: 'btn small', text: 'Not now', onclick: dismissDeload })));
   }
 
-  /* ---------- storage ---------- */
-  function loadLocal() {
-    try {
-      var raw = localStorage.getItem(LS);
-      if (raw) { var m = JSON.parse(raw); if (m && typeof m === 'object') state.logs = m; }
-      var b = localStorage.getItem(LSB);
-      if (b) { var bm = JSON.parse(b); if (bm && typeof bm === 'object') state.body = bm; }
-    } catch (e) { /* storage unavailable */ }
+  /* ---------- storage ----------
+     Web page: the Claude account (db capability). Android app: one JSON snapshot in the app's own files
+     (window.Android.storeSave), which the app also copies to a backup file outside the app. */
+  function snapshot() {
+    return { format: 'liftlog-backup', v: 1, savedAt: Date.now(), logs: state.logs, body: state.body,
+      settings: state.settings, prefs: { autoRest: state.autoRest, sound: state.sound } };
   }
-  function saveLocal() { localStorage.setItem(LS, JSON.stringify(state.logs)); }
-  function saveBodyLocal() { localStorage.setItem(LSB, JSON.stringify(state.body)); }
+  /* reads a backup even if an older, longer file left stray bytes after the JSON */
+  function parseLenient(text) {
+    text = String(text || '').replace(/^\uFEFF/, '').trim();
+    if (!text) return null;
+    try { return JSON.parse(text); } catch (e) { /* fall through */ }
+    var depth = 0, inStr = false, esc = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true;
+      else if (ch === '{') depth++;
+      else if (ch === '}' && --depth === 0) { try { return JSON.parse(text.slice(0, i + 1)); } catch (e) { return null; } }
+    }
+    return null;
+  }
+  function backupCounts(o) {
+    var n = { sessions: 0, body: 0 };
+    if (!o || typeof o !== 'object') return n;
+    Object.keys(o.logs || {}).forEach(function (k) { var d = o.logs[k]; if (d && PLAN[d.day] && d.entries && d.date) n.sessions++; });
+    Object.keys(o.body || {}).forEach(function (k) { var d = o.body[k]; if (d && d.date) n.body++; });
+    return n;
+  }
+  function hasData(o) { var n = backupCounts(o); return n.sessions + n.body > 0; }
+  function applySnapshot(o) {
+    var logs = {}, body = {};
+    Object.keys(o.logs || {}).forEach(function (k) { var d = o.logs[k]; if (d && PLAN[d.day] && d.entries && d.date) logs[d.id || k] = d; });
+    Object.keys(o.body || {}).forEach(function (k) { var d = o.body[k]; if (d && d.date) body[d.id || k] = d; });
+    state.logs = logs;
+    state.body = body;
+    if (o.settings) applySettings(o.settings);
+    if (o.prefs) {
+      if (typeof o.prefs.autoRest === 'boolean') state.autoRest = o.prefs.autoRest;
+      if (typeof o.prefs.sound === 'boolean') state.sound = o.prefs.sound;
+    }
+  }
+  /* returns where the data came from: 'native', 'migrated', 'backup' or 'empty' */
+  function loadLocal() {
+    var native = null, src = 'empty';
+    if (NATIVE && NATIVE.storeLoad) { try { native = parseLenient(NATIVE.storeLoad()); } catch (e) { native = null; } }
+    if (hasData(native)) {
+      applySnapshot(native);
+      src = 'native';
+    } else {
+      try {
+        var raw = localStorage.getItem(LS);
+        if (raw) { var m = JSON.parse(raw); if (m && typeof m === 'object') state.logs = m; }
+        var b = localStorage.getItem(LSB);
+        if (b) { var bm = JSON.parse(b); if (bm && typeof bm === 'object') state.body = bm; }
+      } catch (e) { /* storage unavailable */ }
+      if (hasData({ logs: state.logs, body: state.body })) src = 'migrated';
+      else if (NATIVE && NATIVE.backupReadKnown) {
+        var bk = null;
+        try { bk = parseLenient(NATIVE.backupReadKnown()); } catch (e) { bk = null; }
+        if (hasData(bk)) { applySnapshot(bk); src = 'backup'; }
+      }
+    }
+    state.loaded = true;
+    if (src === 'migrated' || src === 'backup') storeNative();
+    if (src === 'backup') state.dataMsg = 'Your data was restored from the backup file.';
+    return src;
+  }
+  function storeNative() {
+    if (!NATIVE || !NATIVE.storeSave || !state.loaded) return null;
+    try { return NATIVE.storeSave(JSON.stringify(snapshot())) !== false; } catch (e) { return false; }
+  }
+  function writeLocal(key, val) {
+    var native = storeNative();
+    try { localStorage.setItem(key, JSON.stringify(val)); }
+    catch (e) { if (!native) throw e; }
+  }
+  function saveLocal() { writeLocal(LS, state.logs); }
+  function saveBodyLocal() { writeLocal(LSB, state.body); }
+  /* merge a backup into what is here: per session/day the newer copy wins; settings only fill gaps */
+  function importBackup(o) {
+    var sess = [], bod = [], changed = false, s = (o && o.settings) || {};
+    Object.keys((o && o.logs) || {}).forEach(function (k) {
+      var d = o.logs[k];
+      if (!d || !PLAN[d.day] || !d.entries || !/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) return;
+      var id = 's_' + d.date + '_' + d.day, cur = state.logs[id];
+      if (cur && (cur.updated || 0) >= (d.updated || 0)) return;
+      sess.push(Object.assign({}, d, { id: id }));
+    });
+    Object.keys((o && o.body) || {}).forEach(function (k) {
+      var d = o.body[k];
+      if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) return;
+      var id = 'b_' + d.date, cur = state.body[id];
+      if (cur && (cur.updated || 0) >= (d.updated || 0)) return;
+      bod.push(Object.assign({}, d, { id: id, type: 'body' }));
+    });
+    if (s.rest && typeof s.rest === 'object') Object.keys(s.rest).forEach(function (k) {
+      if (state.settings.rest[k] == null && typeof s.rest[k] === 'number' && EXMAP[k]) { state.settings.rest[k] = s.rest[k]; changed = true; }
+    });
+    if (s.swaps && typeof s.swaps === 'object') Object.keys(s.swaps).forEach(function (k) {
+      var sl = null;
+      DAYS.forEach(function (d) { sl = sl || slotById(d, k); });
+      if (!state.settings.swaps[k] && sl && sl.alts.indexOf(s.swaps[k]) >= 0) { state.settings.swaps[k] = s.swaps[k]; changed = true; }
+    });
+    if (Array.isArray(s.deloads)) s.deloads.forEach(function (w) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(w) && state.settings.deloads.indexOf(w) < 0) { state.settings.deloads.push(w); changed = true; }
+    });
+    if (changed) { state.settings.deloads.sort(); saveSettings(); }
+    var p;
+    if (state.kind === 'cloud') {
+      p = saving;
+      sess.forEach(function (d) { p = p.then(function () { return col.doc(d.id).set(d); }).then(function () { state.logs[d.id] = d; }); });
+      p = p.then(function () { return saveBodyDocs(bod); });
+    } else {
+      sess.forEach(function (d) { state.logs[d.id] = d; });
+      bod.forEach(function (d) { state.body[d.id] = d; });
+      p = Promise.resolve().then(function () { saveLocal(); saveBodyLocal(); });
+    }
+    state.busy++;
+    setStatus('saving');
+    saving = p.then(function () { state.busy--; setStatus('saved'); pushWatch(); }, function () { state.busy--; setStatus('error'); });
+    return saving.then(function () { return { sessions: sess.length, body: bod.length }; });
+  }
   function persist(d) { return persistRaw(d).then(function (v) { pushWatch(); return v; }); }
   function persistRaw(d) {
     if (isEmpty(d)) {
@@ -1025,7 +1144,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     el.textContent = s === 'connecting' ? 'Connecting…'
       : s === 'saving' ? 'Saving…'
       : s === 'error' ? 'Not saved · tap to retry'
-      : (state.kind === 'cloud' ? 'Saved' : 'Saved on this device');
+      : (state.kind === 'cloud' ? 'Saved' : NATIVE && NATIVE.storeSave ? 'Saved · backed up' : 'Saved on this device');
   }
   function scheduleSave() {
     state.dirty = true;
@@ -1097,7 +1216,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     }).catch(function () { return false; }).then(function (ok) {
       if (ok) return;
       state.kind = 'local';
-      loadLocal();
+      var src = loadLocal();
+      if (src === 'backup') setTimeout(function () { setTab('history'); var el = document.getElementById('dataPanel'); if (el) el.scrollIntoView({ block: 'start' }); }, 0);
       if (!state.dirty && !state.busy && !inputFocused()) reloadDraft();
       setStatus('saved');
       render();
@@ -1112,6 +1232,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   function saveSettings() {
     pushWatch();
     try { localStorage.setItem('liftlog.settings', JSON.stringify(state.settings)); } catch (e) { /* ignore */ }
+    storeNative();
     clearTimeout(setSaveT);
     setSaveT = setTimeout(function () {
       var s = state.settings;
@@ -1122,6 +1243,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   }
   function savePrefs() {
     try { localStorage.setItem('liftlog.prefs', JSON.stringify({ autoRest: state.autoRest, sound: state.sound })); } catch (e) { /* ignore */ }
+    storeNative();
   }
   function restDefault(id) { return EXMAP[id] ? EXMAP[id].rest : 90; }
   function restFor(id) { var v = state.settings.rest[id]; return typeof v === 'number' && v > 0 ? v : restDefault(id); }
@@ -1596,7 +1718,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         h('button', { type: 'button', class: 'btn small', text: 'Today', onclick: function () {
           flush(); state.date = todayISO(); reloadDraft(); renderLog();
         } })),
-      ...[deloadBanner()].filter(Boolean),
+      ...[restoreBanner(), deloadBanner()].filter(Boolean),
       wkCard(),
       h('div', { class: 'summary', id: 'sum' }),
       ...PLAN[state.day].slots.map(exCard),
@@ -2526,6 +2648,92 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       renderHistory();
     }, function () { state.busy--; setStatus('error'); renderHistory(); });
   }
+  /* ---------- your data: backup file (app) or export/import (web) ---------- */
+  function ago(ms) {
+    var d = Date.now() - ms;
+    if (d < 60000) return 'just now';
+    if (d < 3600000) return Math.round(d / 60000) + ' min ago';
+    if (d < 86400000) return Math.round(d / 3600000) + ' h ago';
+    return fmtShort(iso(new Date(ms)));
+  }
+  function backupStatus() {
+    if (!NATIVE || !NATIVE.backupStatus) return null;
+    try { return JSON.parse(NATIVE.backupStatus()); } catch (e) { return null; }
+  }
+  function showDataMsg(msg) {
+    state.dataMsg = msg;
+    var el = document.getElementById('dmsg');
+    if (el) el.textContent = msg; else render();
+  }
+  window.liftlogBackupStatus = function (str) {
+    var st = null;
+    try { st = JSON.parse(str); } catch (e) { /* ignore */ }
+    state.dataMsg = st && st.error ? st.error : st && st.lastAt ? 'Backup saved.' : '';
+    if (state.tab === 'history') renderHistory();
+  };
+  window.liftlogRestore = function (str) {
+    var o = parseLenient(str);
+    if (o && o.status) {
+      showDataMsg(o.status === 'cancelled' ? '' : 'Could not read that file' + (o.message ? ': ' + o.message : '.'));
+      return;
+    }
+    if (!o || o.format !== 'liftlog-backup' && !o.logs) { showDataMsg('That file is not a Lift Log backup.'); return; }
+    var n = backupCounts(o);
+    if (!n.sessions && !n.body) { showDataMsg('That backup file is empty.'); return; }
+    importBackup(o).then(function (r) {
+      state.dataMsg = 'Restored from backup: ' + r.sessions + (r.sessions === 1 ? ' session' : ' sessions') + ' and ' + r.body + (r.body === 1 ? ' body entry' : ' body entries') +
+        ' added or updated' + (r.sessions + r.body < n.sessions + n.body ? '. Entries you already had here were kept.' : '.');
+      if (!state.dirty && !state.busy) reloadDraft();
+      render();
+    });
+  };
+  function restoreFromFile() {
+    if (NATIVE && NATIVE.backupRestore) { showDataMsg('Choose your LiftLog-backup.json file…'); NATIVE.backupRestore(); }
+  }
+  function dataPanel() {
+    var kids = [h('h2', { text: 'Your data' })];
+    if (NATIVE && NATIVE.backupStatus) {
+      var st = backupStatus() || {};
+      kids.push(h('p', { class: 'subnote', text: 'Saved on this phone. Installing a new version over the app keeps everything. A copy is also kept in a backup file outside the app, so you can get it back even if the app is uninstalled.' }));
+      var line = st.where
+        ? (st.lastAt ? 'Backed up ' + ago(st.lastAt) : 'Not written yet') + ' to ' + st.where
+        : st.canAuto ? 'The backup file is created after your first saved session.' : 'Choose where to keep the backup file.';
+      kids.push(h('div', { class: 'bkstat' + (st.error ? ' bad' : st.lastAt ? ' ok' : '') },
+        h('span', { class: 'dot' }), h('span', { text: st.error ? st.error : line })));
+      kids.push(h('div', { class: 'acts' },
+        h('button', { type: 'button', class: 'btn', text: 'Restore from backup file', onclick: restoreFromFile }),
+        h('button', { type: 'button', class: 'btn', text: 'Back up now', onclick: function () { showDataMsg('Backing up…'); NATIVE.backupNow(); } }),
+        h('button', { type: 'button', class: 'btn', text: 'Choose backup location', onclick: function () { NATIVE.backupChoose(); } })));
+      kids.push(h('p', { class: 'subnote', text: 'Tip: "Choose backup location" can also save it to Google Drive, so the copy survives losing the phone. Restoring merges the file with what is here; the newer copy of each session wins.' }));
+    } else {
+      kids.push(h('p', { class: 'subnote', text: (state.kind === 'cloud' ? 'Saved to your Claude account. ' : '') + 'Export a backup file to move your data into the Android app (Your data → Restore from backup file), or import one from the app here. Importing merges; the newer copy of each session wins.' }));
+      kids.push(h('div', { class: 'acts' },
+        h('button', { type: 'button', class: 'btn', text: 'Export backup file', onclick: function () {
+          exportCsv('LiftLog-backup-' + todayISO() + '.json', JSON.stringify(snapshot()), $('#dmsg'));
+        } })));
+      kids.push(h('label', { class: 'lbl', for: 'importFile' }, 'Import a backup file',
+        h('input', { type: 'file', id: 'importFile', accept: '.json,application/json,text/plain', onchange: function (ev) {
+          var f = ev.target.files && ev.target.files[0];
+          if (!f) return;
+          var rd = new FileReader();
+          rd.onload = function () { window.liftlogRestore(String(rd.result || '')); };
+          rd.onerror = function () { showDataMsg('Could not read that file.'); };
+          rd.readAsText(f);
+        } })));
+    }
+    kids.push(h('p', { class: 'msg', id: 'dmsg', 'aria-live': 'polite', text: state.dataMsg || '' }));
+    return h('section', { class: 'panel', id: 'dataPanel' }, kids);
+  }
+  function restoreBanner() {
+    if (!NATIVE || !NATIVE.backupRestore || !state.loaded || hasData({ logs: state.logs, body: state.body })) return null;
+    return h('section', { class: 'banner' },
+      h('h2', null, h('span', { class: 'tag t-info', text: 'New install' }), 'Restore your data?'),
+      h('p', { text: 'If you used Lift Log before, pick the LiftLog-backup.json file (usually in Download/LiftLog) to bring back your sessions and body data.' }),
+      h('div', { class: 'acts' },
+        h('button', { type: 'button', class: 'btn small primary', text: 'Restore from backup file', onclick: restoreFromFile })),
+      h('p', { class: 'msg', id: 'dmsg', 'aria-live': 'polite', text: state.dataMsg || '' }));
+  }
+
   function renderHistory() {
     var v = $('#view');
     v.className = 'view';
@@ -2534,7 +2742,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       v.replaceChildren(h('div', { class: 'panel empty' },
         h('h2', { text: 'No sessions yet' }),
         h('p', { text: 'Every workout you log is listed here, newest first.' }),
-        h('button', { type: 'button', class: 'btn', text: 'Start a session', onclick: function () { setTab('log'); } })));
+        h('button', { type: 'button', class: 'btn', text: 'Start a session', onclick: function () { setTab('log'); } })),
+        dataPanel());
       return;
     }
     var list = docs.map(function (doc) {
@@ -2570,7 +2779,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       h('div', { class: 'hhead' }, h('h2', { text: docs.length + (docs.length === 1 ? ' session' : ' sessions') }),
         h('button', { type: 'button', class: 'btn small', text: 'Export CSV', onclick: function () { exportCsv('lift-log-' + todayISO() + '.csv', sessionsCsvText(), $('#hmsg')); } })),
       h('p', { class: 'msg', id: 'hmsg', 'aria-live': 'polite' }),
-      ...list);
+      ...list,
+      dataPanel());
   }
 
   /* ---------- wiring ---------- */
@@ -2588,7 +2798,12 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     if (!state.draft.endedAt) startWorkout();
     window.scrollTo(0, 0);
   });
-  $('#sync').addEventListener('click', function () { if (state.status === 'error') { state.dirty = true; flush(); } });
+  $('#sync').addEventListener('click', function () {
+    if (state.status === 'error') { state.dirty = true; flush(); return; }
+    setTab('history');
+    var el = document.getElementById('dataPanel');
+    if (el) el.scrollIntoView({ block: 'start' });
+  });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) flush();
     else { if (activeSession()) keepAwake(); updateTimes(); }
