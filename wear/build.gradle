@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.liftlog.wear'
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         // Same package and signing key as the phone app: required for the watch and phone to sync.

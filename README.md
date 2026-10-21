@@ -23,6 +23,13 @@ Software information > tap Software version 5 times), then turn on ADB debugging
 debugging. From a computer with Android platform-tools:
 `adb pair IP:PAIRPORT` (code from the watch), `adb connect IP:PORT`, `adb install LiftLog-Watch.apk`.
 
+## Body data
+The Body tab tracks weight, body fat and tape measurements. Data comes in three ways:
+- typed in by hand;
+- Health Connect (Android app only): weight and body fat written by Samsung Health, Zepp Life and others;
+- CSV import (date, weight, optional body fat). Xiaomi Home does not share scale data with other Android
+  apps, so export it to CSV first (for example with SmartScaleConnect) and import the file.
+
 ## Phone features
 - Screen stays on while a workout is running.
 - Vibration when rest is over (plus a beep if sound is on).

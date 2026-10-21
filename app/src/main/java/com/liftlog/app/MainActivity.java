@@ -1,19 +1,30 @@
 package com.liftlog.app;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 public class MainActivity extends Activity {
+    private static final int REQ_FILE = 41;
+    private static final int REQ_HEALTH = 42;
+
     private WebView web;
+    private ValueCallback<Uri[]> fileCallback;
+    private int healthDays = 400;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,7 +37,23 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(true);
         web.setWebViewClient(new WebViewClient());
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                fileCallback = callback;
+                Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("*/*");
+                try {
+                    startActivityForResult(Intent.createChooser(pick, "Choose a CSV file"), REQ_FILE);
+                    return true;
+                } catch (ActivityNotFoundException e) {
+                    fileCallback = null;
+                    return false;
+                }
+            }
+        });
         web.addJavascriptInterface(new Bridge(), "Android");
         setContentView(web);
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
@@ -65,6 +92,34 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE) {
+            if (fileCallback != null) {
+                fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+                fileCallback = null;
+            }
+        } else if (requestCode == REQ_HEALTH) {
+            // Read again: if permission was granted the data comes back, otherwise the page shows why not.
+            HealthBridge.read(this, healthDays, this::deliverHealth);
+        }
+    }
+
+    /** Hand a Health Connect result to the page as a JSON string. */
+    private void deliverHealth(String json) {
+        runOnUiThread(() -> web.evaluateJavascript(
+            "window.liftlogHealth && window.liftlogHealth(" + JSONObject.quote(json) + ")", null));
+    }
+
+    private static String status(String json) {
+        try {
+            return new JSONObject(json).optString("status");
+        } catch (JSONException e) {
+            return "";
+        }
+    }
+
     private class Bridge {
         @JavascriptInterface
         public void keepAwake(final boolean on) {
@@ -90,6 +145,45 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void syncWatch(String json) {
             WatchSync.pushState(MainActivity.this, json);
+        }
+
+        @JavascriptInterface
+        public String healthAvailable() {
+            return HealthBridge.status(MainActivity.this);
+        }
+
+        /** Read weight and body fat from Health Connect; with prompt=true, ask for permission if needed. */
+        @JavascriptInterface
+        public void healthImport(final int days, final boolean prompt) {
+            runOnUiThread(() -> {
+                String st = HealthBridge.status(MainActivity.this);
+                if (!"available".equals(st)) {
+                    if (prompt && "update_required".equals(st)) {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW,
+                                Uri.parse("market://details?id=com.google.android.apps.healthdata&url=healthconnect%3A%2F%2Fonboarding")));
+                        } catch (ActivityNotFoundException ignored) {
+                            // no Play Store: the page explains what to do
+                        }
+                    }
+                    deliverHealth("{\"status\":\"" + st + "\"}");
+                    return;
+                }
+                healthDays = days;
+                HealthBridge.read(MainActivity.this, days, json -> {
+                    if (prompt && "no_permission".equals(status(json))) {
+                        runOnUiThread(() -> {
+                            try {
+                                startActivityForResult(HealthBridge.permissionIntent(MainActivity.this), REQ_HEALTH);
+                            } catch (ActivityNotFoundException e) {
+                                deliverHealth("{\"status\":\"unavailable\"}");
+                            }
+                        });
+                    } else {
+                        deliverHealth(json);
+                    }
+                });
+            });
         }
 
         @JavascriptInterface
