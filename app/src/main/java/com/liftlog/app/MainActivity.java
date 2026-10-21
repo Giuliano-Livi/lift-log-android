@@ -21,6 +21,7 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
     private static final int REQ_FILE = 41;
     private static final int REQ_HEALTH = 42;
+    private static final int REQ_OCR = 43;
 
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
@@ -100,6 +101,10 @@ public class MainActivity extends Activity {
                 fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
                 fileCallback = null;
             }
+        } else if (requestCode == REQ_OCR) {
+            Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+            if (uri == null) deliverOcr("{\"status\":\"cancelled\"}");
+            else ReportOcr.read(this, uri, this::deliverOcr);
         } else if (requestCode == REQ_HEALTH) {
             // Read again: if permission was granted the data comes back, otherwise the page shows why not.
             HealthBridge.read(this, healthDays, this::deliverHealth);
@@ -110,6 +115,12 @@ public class MainActivity extends Activity {
     private void deliverHealth(String json) {
         runOnUiThread(() -> web.evaluateJavascript(
             "window.liftlogHealth && window.liftlogHealth(" + JSONObject.quote(json) + ")", null));
+    }
+
+    /** Hand the text read from a report image to the page as a JSON string. */
+    private void deliverOcr(String json) {
+        runOnUiThread(() -> web.evaluateJavascript(
+            "window.liftlogOcr && window.liftlogOcr(" + JSONObject.quote(json) + ")", null));
     }
 
     private static String status(String json) {
@@ -183,6 +194,21 @@ public class MainActivity extends Activity {
                         deliverHealth(json);
                     }
                 });
+            });
+        }
+
+        /** Let the user pick a body report image and read its text on the phone. */
+        @JavascriptInterface
+        public void ocrPickImage() {
+            runOnUiThread(() -> {
+                Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("image/*");
+                try {
+                    startActivityForResult(Intent.createChooser(pick, "Choose the report image"), REQ_OCR);
+                } catch (ActivityNotFoundException e) {
+                    deliverOcr("{\"status\":\"error\",\"message\":\"no app to pick images\"}");
+                }
             });
         }
 

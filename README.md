@@ -26,6 +26,9 @@ debugging. From a computer with Android platform-tools:
 ## Body data
 The Body tab tracks weight, body fat and tape measurements. Data comes in three ways:
 - typed in by hand;
+- a Xiaomi Home report image (shared from the app as a picture): read on the phone with ML Kit text
+  recognition, then shown for review before saving (weight, body fat, muscle, skeletal muscle, water,
+  visceral fat, BMR, bone mass, protein);
 - Health Connect (Android app only): weight and body fat written by Samsung Health, Zepp Life and others;
 - CSV import (date, weight, optional body fat). Xiaomi Home does not share scale data with other Android
   apps, so export it to CSV first (for example with SmartScaleConnect) and import the file.

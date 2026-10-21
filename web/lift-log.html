@@ -357,6 +357,7 @@ body.docked { padding-bottom: 230px; }
 .filebtn { display: inline-flex; align-items: center; gap: 8px; }
 .filebtn input { font-size: 14px; max-width: 100%; }
 details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); min-height: 32px; display: flex; align-items: center; }
+#reportPanel { scroll-margin-top: 140px; }
 .tiles.t4 { grid-template-columns: repeat(2, 1fr); }
 @media (min-width: 520px) { .tiles.t4 { grid-template-columns: repeat(4, 1fr); } }
 
@@ -646,7 +647,7 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
     week: weekStartOf(todayISO()), bmetric: 'weight', bform: null, confirmDel: null, confirmBody: null,
     settings: { rest: {}, swaps: {}, deloads: [] },
     restT: null, autoRest: true, sound: true, confirmReset: false, swapOpen: null, swapAlways: false,
-    healthMsg: '', healthSilent: false, importMsg: ''
+    healthMsg: '', healthSilent: false, importMsg: '', report: null, reportMsg: '', vision: null
   };
   function applySettings(v) {
     if (!v || typeof v !== 'object') return;
@@ -1040,6 +1041,10 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
         return Promise.all([c.use('db'), c.use('user')]).then(function (r) {
           var db = r[0], user = r[1];
           return (user ? user.id() : Promise.resolve(null)).then(function (uid) {
+            c.use('sample').then(function (smp) {
+              if (!smp) return null;
+              return smp.limits().then(function (l) { if (l && l.images) { state.vision = smp; if (state.tab === 'body') renderBody(); } });
+            }).catch(function () { /* reading images unavailable */ });
             if (db && uid) {
               col = db.collection('data/users/' + uid);
               state.kind = 'cloud';
@@ -1772,6 +1777,323 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
     drawChart('chart');
   }
 
+  /* ---------- Xiaomi body report reader ----------
+     Input: text recognised in the report image, as lines with word boxes in image pixels:
+     { width, height, lines: [{ t, x, y, w, h, words: [{ t, x, y, w, h }] }] }.
+     Values in the report sit directly above their label (or after it, for "Standard weight: 70.0"). */
+  var REPORT_FIELDS = [
+    { k: 'bmi', pats: [['bmi']], min: 10, max: 60 },
+    { k: 'fat', pats: [['body', 'fat']], notNext: ['mass'], min: 2, max: 75 },
+    { k: 'waterKg', pats: [['body', 'water', 'mass']], min: 10, max: 120 },
+    { k: 'fatKg', pats: [['fat', 'mass']], notPrev: ['body', 'free'], min: 1, max: 150 },
+    { k: 'bone', pats: [['bone', 'mineral', 'mass'], ['bone', 'mass']], min: 0.5, max: 10 },
+    { k: 'proteinKg', pats: [['protein', 'mass']], min: 2, max: 40 },
+    { k: 'muscle', pats: [['muscle', 'mass']], notPrev: ['skeletal'], min: 10, max: 150 },
+    { k: 'musclePct', pats: [['muscle', 'percentage'], ['muscle', 'rate']], min: 20, max: 95 },
+    { k: 'water', pats: [['body', 'water']], notNext: ['mass'], min: 20, max: 85 },
+    { k: 'protein', pats: [['protein', 'percentage'], ['protein', 'rate']], min: 5, max: 30 },
+    { k: 'bonePct', pats: [['bone', 'mineral', 'percentage']], min: 1, max: 10 },
+    { k: 'smm', pats: [['skeletal', 'muscle']], min: 5, max: 80 },
+    { k: 'visceral', pats: [['visceral', 'fat']], min: 1, max: 59, int: true },
+    { k: 'bmr', pats: [['basal', 'metabolic'], ['metabolic', 'rate']], min: 600, max: 5000, int: true },
+    { k: 'whr', pats: [['waist-to-hip'], ['waist', 'to', 'hip']], min: 0.5, max: 1.6 },
+    { k: 'bodyAge', pats: [['body', 'age']], min: 10, max: 100, int: true },
+    { k: 'ffm', pats: [['fat-free'], ['fat', 'free']], min: 20, max: 200 },
+    { k: 'hr', pats: [['heart', 'rate']], min: 30, max: 220, int: true },
+    { k: 'stdWeight', pats: [['standard', 'weight']], inline: true, min: 25, max: 300 },
+    { k: 'ctrl', pats: [['weight', 'control']], inline: true, signed: true, min: -150, max: 150 }
+  ];
+  function lev(a, b) {
+    if (Math.abs(a.length - b.length) > 2) return 3;
+    var prev = [], cur, i, j;
+    for (j = 0; j <= b.length; j++) prev.push(j);
+    for (i = 1; i <= a.length; i++) {
+      cur = [i];
+      for (j = 1; j <= b.length; j++) cur.push(Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+  function tokOf(t) { return String(t || '').toLowerCase().replace(/[^a-z\-]/g, ''); }
+  /* 2 = exact, 1 = close enough, 0.5 = one letter off in a short word, 0 = different */
+  function wordMatch(a, b) {
+    a = a.replace(/-/g, ''); b = b.replace(/-/g, '');
+    if (!a) return 0;
+    if (a === b) return 2;
+    if (b.length >= 8) return lev(a, b) <= 2 ? 1 : 0;
+    if (b.length >= 4) return lev(a, b) <= 1 ? 1 : 0;
+    return b.length === 3 && a.length === 3 && lev(a, b) <= 1 ? 0.5 : 0;
+  }
+  function sameWord(a, b) { return wordMatch(a, b) >= 1; }
+  function numIn(t) {
+    var m = /(\d+(?:[.,]\d+)?)/.exec(String(t || '').replace(/[Oo](?=\d)|(?<=\d)[Oo]/g, '0'));
+    return m ? parseFloat(m[1].replace(',', '.')) : null;
+  }
+  function reportWords(ocr) {
+    var rows = [];
+    (ocr.lines || []).forEach(function (l) {
+      var ws = (l.words && l.words.length ? l.words : [l]).filter(function (w) { return w && w.t; }).map(function (w) {
+        return { t: String(w.t), tok: tokOf(w.t), x: +w.x || 0, y: +w.y || 0, w: +w.w || 0, h: +w.h || 1 };
+      }).sort(function (a, b) { return a.x - b.x; });
+      if (ws.length) rows.push(ws);
+    });
+    rows.sort(function (a, b) { return a[0].y - b[0].y || a[0].x - b[0].x; });
+    return rows;
+  }
+  function findLabel(rows, f) {
+    for (var r = 0; r < rows.length; r++) {
+      var ws = rows[r];
+      for (var i = 0; i < ws.length; i++) {
+        for (var p = 0; p < f.pats.length; p++) {
+          var pat = f.pats[p], ok = true, weak = 0, loose = 0;
+          for (var j = 0; j < pat.length; j++) {
+            var m = ws[i + j] ? wordMatch(ws[i + j].tok, pat[j]) : 0;
+            if (!m) { ok = false; break; }
+            if (m === 0.5) weak++;
+            else if (m === 1) loose++;
+          }
+          // a short word one letter off ("Fal mass") only counts when the rest of the label is exact
+          if (ok && weak && (weak > 1 || loose || pat.length < 2)) ok = false;
+          if (!ok) continue;
+          var next = ws[i + pat.length], prev = ws[i - 1];
+          if (f.notNext && next && f.notNext.some(function (n) { return sameWord(next.tok, n); })) continue;
+          if (f.notPrev && prev && f.notPrev.some(function (n) { return sameWord(prev.tok, n); })) continue;
+          var last = ws[i + pat.length - 1];
+          return { row: ws, i: i, end: i + pat.length, x: ws[i].x, y: Math.min(ws[i].y, last.y), h: ws[i].h, right: last.x + last.w };
+        }
+      }
+    }
+    return null;
+  }
+  function inRange(f, v) { return v != null && isFinite(v) && v >= f.min && v <= f.max; }
+  /* value of a number word, joining a split "61 2" (lost decimal point) or "1 692" (thousands) when needed */
+  function wordValue(f, ws, i) {
+    var w = ws[i], v = numIn(w.t), nx = ws[i + 1];
+    if (v == null) return null;
+    var nextDigits = nx && /^\d{1,3}$/.test(nx.t) && nx.x - (w.x + w.w) < Math.max(w.h, 12) ? nx.t : null;
+    var hasDot = /\d[.,]\d/.test(w.t);
+    if (nextDigits && !hasDot && /^\d+$/.test(w.t.replace(/[^\d]/g, ''))) {
+      var joined = nextDigits.length === 3 ? parseFloat(String(v) + nextDigits) : parseFloat(v + '.' + nextDigits);
+      if (inRange(f, joined) && (!inRange(f, v) || nextDigits.length === 1)) v = joined;
+    }
+    if (!f.int && f.k !== 'whr' && /\d[.,]\d{2,}/.test(w.t)) v = Math.round(v * 10) / 10;
+    return v;
+  }
+  function valueAbove(rows, f, lab) {
+    var best = null, bestScore = Infinity, maxDx = 0;
+    rows.forEach(function (ws) { ws.forEach(function (w) { maxDx = Math.max(maxDx, w.x + w.w); }); });
+    maxDx = Math.max(60, maxDx * 0.2);
+    rows.forEach(function (ws) {
+      ws.forEach(function (w, i) {
+        if (!/\d/.test(w.t)) return;
+        var bottom = w.y + w.h;
+        if (w.y + w.h * 0.5 >= lab.y) return;
+        var gap = lab.y - bottom;
+        if (gap > Math.max(lab.h, w.h) * 2.6 + 8) return;
+        var dx = Math.abs(w.x - lab.x);
+        if (dx > maxDx) return;
+        var prevW = ws[i - 1];
+        if (prevW && /^[↑↓+tT14]$|^[↑↓]/.test(prevW.t) && prevW.x + prevW.w > w.x - prevW.h) return;
+        var v = wordValue(f, ws, i);
+        if (!inRange(f, v)) return;
+        var score = Math.max(0, gap) + dx * 0.6;
+        if (score < bestScore) { bestScore = score; best = v; }
+      });
+    });
+    return best;
+  }
+  function valueInline(rows, f, lab) {
+    for (var i = lab.end; i < lab.row.length; i++) {
+      var w = lab.row[i];
+      if (!/\d/.test(w.t)) continue;
+      var v = numIn(w.t);
+      if (v == null) continue;
+      if (f.signed) {
+        var before = (lab.row[i - 1] && i - 1 >= lab.end ? lab.row[i - 1].t : '') + w.t;
+        if (/[-−–=~]\s*\d/.test(before) || /^[-−–=~]$/.test(lab.row[i - 1] ? lab.row[i - 1].t : '')) v = -v;
+      }
+      if (inRange(f, v)) return v;
+    }
+    return null;
+  }
+  function bigNumber(rows, height) {
+    var best = null;
+    rows.forEach(function (ws) {
+      ws.forEach(function (w, i) {
+        if (!/^\d{2,3}([.,]\d)?$/.test(w.t.replace(/[^\d.,]/g, '')) || (height && w.y > height * 0.25)) return;
+        if (!best || w.h > best.w.h) best = { w: w, ws: ws, i: i };
+      });
+    });
+    if (!best) return null;
+    var v = numIn(best.w.t), nx = best.ws[best.i + 1];
+    if (v === Math.floor(v) && nx && /^[.,]?\d$/.test(nx.t.replace(/\s/g, '')) && nx.x - (best.w.x + best.w.w) < best.w.h) v = parseFloat(v + '.' + nx.t.replace(/[^\d]/g, ''));
+    return v >= 25 && v <= 300 ? v : null;
+  }
+  function reportDate(rows) {
+    var now = todayISO(), out = null;
+    rows.some(function (ws) {
+      var text = ws.map(function (w) { return w.t; }).join(' '), m;
+      if ((m = /(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/.exec(text))) { out = m[1] + '-' + pad(+m[2]) + '-' + pad(+m[3]); return true; }
+      if ((m = /(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/.exec(text))) {
+        var a = +m[1], b = +m[2], mo = a, d = b;
+        if (a > 12) { d = a; mo = b; }
+        var iso1 = m[3] + '-' + pad(mo) + '-' + pad(d);
+        if (a <= 12 && b <= 12 && iso1 > now) iso1 = m[3] + '-' + pad(b) + '-' + pad(a);
+        out = iso1;
+        return true;
+      }
+      return false;
+    });
+    return out && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(out) ? out : null;
+  }
+  function parseReport(ocr) {
+    var rows = reportWords(ocr), v = {};
+    REPORT_FIELDS.forEach(function (f) {
+      var lab = findLabel(rows, f);
+      if (!lab) return;
+      var val = f.inline ? valueInline(rows, f, lab) : valueAbove(rows, f, lab);
+      if (val != null) v[f.k] = f.int ? Math.round(val) : rnd(val);
+    });
+    var big = bigNumber(rows, ocr.height), calc = [];
+    if (v.ffm != null && v.fatKg != null) calc.push(rnd(v.ffm + v.fatKg));
+    if (v.stdWeight != null && v.ctrl != null) calc.push(rnd(v.stdWeight - v.ctrl));
+    // the report's own numbers (fat-free + fat mass, standard weight − weight control) beat reading the big digits
+    var weight = null;
+    if (calc.length) {
+      weight = calc[0];
+      if (calc.length > 1 && Math.abs(calc[0] - calc[1]) > 0.3 && big != null) {
+        weight = Math.abs(calc[1] - big) < Math.abs(calc[0] - big) ? calc[1] : calc[0];
+      }
+    } else if (big != null) {
+      weight = big;
+    }
+    if (weight != null) v.weight = Math.round(weight * 10) / 10;
+    if (v.fat == null && v.fatKg != null && v.weight) v.fat = Math.round(v.fatKg / v.weight * 1000) / 10;
+    if (v.water == null && v.waterKg != null && v.weight) v.water = Math.round(v.waterKg / v.weight * 1000) / 10;
+    if (v.protein == null && v.proteinKg != null && v.weight) v.protein = Math.round(v.proteinKg / v.weight * 1000) / 10;
+    v.date = reportDate(rows);
+    return v;
+  }
+
+  /* report import: phone app reads the image on the device; the web page asks Claude to read it */
+  function reportFound(v) {
+    return ['bmi', 'fat', 'muscle', 'smm', 'water', 'visceral', 'bmr', 'bone', 'ffm', 'fatKg', 'waterKg'].filter(function (k) { return v[k] != null; }).length;
+  }
+  function openReport(v, how) {
+    var r = { date: v.date || todayISO(), how: how, dateFound: !!v.date };
+    REPORT_KEYS.forEach(function (k) { r[k] = v[k] != null ? String(v[k]) : ''; });
+    state.report = r;
+    state.reportMsg = '';
+    renderBody();
+    var el = document.getElementById('reportPanel');
+    if (el) el.scrollIntoView({ block: 'start' });
+  }
+  window.liftlogOcr = function (str) {
+    var res;
+    try { res = typeof str === 'string' ? JSON.parse(str) : str; } catch (e) { return; }
+    if (!res || res.status !== 'ok') {
+      state.reportMsg = res && res.status === 'cancelled' ? '' : 'Could not read that image' + (res && res.message ? ': ' + res.message : '.');
+      if (state.tab === 'body') renderBody();
+      return;
+    }
+    var v = parseReport(res);
+    if (reportFound(v) < 3) {
+      state.reportMsg = 'That image does not look like a Xiaomi body report. Export the report from Xiaomi Home and pick that image.';
+      if (state.tab === 'body') renderBody();
+      return;
+    }
+    openReport(v, 'device');
+  };
+  function pickReportImage() {
+    if (!NATIVE || !NATIVE.ocrPickImage) return;
+    state.reportMsg = 'Reading the report…';
+    renderBody();
+    try { NATIVE.ocrPickImage(); } catch (e) { state.reportMsg = 'Could not open the image picker.'; renderBody(); }
+  }
+  var REPORT_PROMPT = 'This image is a body composition report exported from the Xiaomi Home app (Mijia smart scale). ' +
+    'Read it and reply with only a JSON object with these keys, using plain numbers without units, or null when a value is not shown: ' +
+    '"date" (measurement date as YYYY-MM-DD; the app writes dates as month/day/year), "weight" (kg, the large number at the top), ' +
+    '"fat" (body fat percentage), "muscle" (muscle mass, kg), "smm" (skeletal muscle mass, kg), "water" (body water percentage), ' +
+    '"visceral" (visceral fat rating), "bmr" (basal metabolic rate, kcal), "bone" (bone mineral mass, kg), "protein" (protein percentage). ' +
+    'Ignore the small change values next to the up and down arrows. Example: {"date":"2026-10-13","weight":75.3,"fat":18.7,"muscle":57.9,"smm":31.8,"water":58.6,"visceral":7,"bmr":1692,"bone":3.3,"protein":17.4}';
+  function readReportWithClaude(file) {
+    if (!state.vision || !file) return;
+    state.reportMsg = 'Claude is reading the report. This can take up to a minute.';
+    renderBody();
+    state.vision.json(REPORT_PROMPT, { images: [file] }).then(function (o) {
+      var v = {};
+      if (o && typeof o === 'object') {
+        BF.forEach(function (x) { var n = typeof o[x.k] === 'number' ? o[x.k] : num(o[x.k]); if (n != null && n >= x.min && n <= x.max) v[x.k] = rnd(n); });
+        if (typeof o.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.date)) v.date = o.date;
+      }
+      if (v.weight == null && reportFound(v) < 2) { state.reportMsg = 'No report values were found in that image.'; renderBody(); return; }
+      openReport(v, 'claude');
+    }, function (e) {
+      var c = e && e.code;
+      state.reportMsg = c === 'not_granted' || c === 'sampling_disabled' ? 'Reading images needs your permission for this page to use Claude.'
+        : c === 'image_rejected' ? 'That file could not be read. Pick a PNG or JPEG image.'
+        : c === 'rate_limited' ? 'Too many requests right now. Try again in a little while.'
+        : c === 'cancelled' ? '' : 'Could not read the report. Try again.';
+      renderBody();
+    });
+  }
+  function saveReport() {
+    var r = state.report, bad = null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date || '')) { state.reportMsg = 'Pick the measurement date.'; renderBody(); return; }
+    var id = 'b_' + r.date, nd = Object.assign({ id: id, type: 'body', date: r.date }, state.body[id] || {}), any = false;
+    REPORT_KEYS.forEach(function (k) {
+      var x = BF.filter(function (b) { return b.k === k; })[0], raw = r[k];
+      if (raw == null || String(raw).trim() === '') return;
+      var v = num(raw);
+      if (v == null || v < x.min || v > x.max) { bad = x.label; return; }
+      nd[k] = rnd(v); any = true;
+    });
+    if (bad) { state.reportMsg = bad + ' looks wrong. Check it against the report.'; renderBody(); return; }
+    if (!any) { state.reportMsg = 'There are no values to save.'; renderBody(); return; }
+    nd.src = 'xiaomi';
+    nd.updated = Date.now();
+    saveBodyDocs([nd]).then(function () {
+      state.report = null;
+      state.reportMsg = 'Saved the report for ' + fmtShort(nd.date) + '.';
+      renderBody();
+    });
+  }
+  function reportPanel() {
+    var r = state.report;
+    var fields = REPORT_KEYS.map(function (k) {
+      var x = BF.filter(function (b) { return b.k === k; })[0];
+      return h('label', { class: 'lbl', for: 'rp_' + k }, bfLabel(x),
+        h('input', { type: 'text', inputmode: 'decimal', id: 'rp_' + k, autocomplete: 'off', value: r[k], oninput: function (ev) { r[k] = ev.target.value; } }));
+    });
+    var found = REPORT_KEYS.filter(function (k) { return r[k] !== ''; }).length;
+    return h('section', { class: 'panel', id: 'reportPanel' },
+      h('h2', { text: 'Check the report values' }),
+      h('p', { class: 'subnote', text: 'Found ' + found + ' of ' + REPORT_KEYS.length + ' values' + (r.how === 'claude' ? ' (read by Claude)' : '') +
+        '. Compare them with the report and fix anything that was misread before saving.' + (r.dateFound ? '' : ' The date was not found, so it is set to today.') }),
+      h('div', { class: 'bform' },
+        h('label', { class: 'lbl full', for: 'rp_date' }, 'Measurement date',
+          h('input', { type: 'date', id: 'rp_date', value: r.date, onchange: function (ev) { r.date = ev.target.value; } })),
+        fields),
+      h('div', { class: 'acts' },
+        h('button', { type: 'button', class: 'btn primary', text: 'Save report', onclick: saveReport }),
+        h('button', { type: 'button', class: 'btn', text: 'Discard', onclick: function () { state.report = null; state.reportMsg = ''; renderBody(); } })));
+  }
+  function reportImportBlock() {
+    var kids = [h('p', { text: 'Xiaomi report: in Xiaomi Home, open the scale measurement and share it as an image. Then read that image here.' })];
+    if (NATIVE && NATIVE.ocrPickImage) {
+      kids.push(h('p', { class: 'subnote', text: 'The image is read on your phone and is not uploaded anywhere.' }),
+        h('div', { class: 'acts' }, h('button', { type: 'button', class: 'btn', text: 'Read Xiaomi report image', onclick: pickReportImage })));
+    } else if (state.vision) {
+      kids.push(h('p', { class: 'subnote', text: 'Claude reads the image for you; the first time, this page asks for your permission.' }),
+        h('label', { class: 'lbl', for: 'rfile' }, 'Report image',
+          h('input', { type: 'file', id: 'rfile', accept: 'image/png,image/jpeg,image/webp', onchange: function (ev) { readReportWithClaude(ev.target.files && ev.target.files[0]); } })));
+    } else {
+      kids.push(h('p', { class: 'muted', text: 'Reading report images works in the Lift Log Android app.' }));
+    }
+    kids.push(h('p', { class: 'msg', 'aria-live': 'polite', text: state.reportMsg || '' }));
+    return h('div', { class: 'opts' }, kids);
+  }
+
   /* ---------- body ---------- */
   var BF = [
     { k: 'weight', label: 'Weight', unit: 'kg', min: 20, max: 400 },
@@ -1779,9 +2101,22 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
     { k: 'waist', label: 'Waist', unit: 'cm', min: 30, max: 250 },
     { k: 'chest', label: 'Chest', unit: 'cm', min: 40, max: 250 },
     { k: 'arm', label: 'Arm', unit: 'cm', min: 10, max: 100 },
-    { k: 'thigh', label: 'Thigh', unit: 'cm', min: 20, max: 150 }
+    { k: 'thigh', label: 'Thigh', unit: 'cm', min: 20, max: 150 },
+    { k: 'muscle', label: 'Muscle mass', unit: 'kg', min: 10, max: 150, comp: true },
+    { k: 'smm', label: 'Skeletal muscle', unit: 'kg', min: 5, max: 80, comp: true },
+    { k: 'water', label: 'Body water', unit: '%', min: 20, max: 85, comp: true },
+    { k: 'visceral', label: 'Visceral fat', unit: '', min: 1, max: 59, comp: true },
+    { k: 'bmr', label: 'BMR', unit: 'kcal', min: 600, max: 5000, comp: true },
+    { k: 'bone', label: 'Bone mass', unit: 'kg', min: 0.5, max: 10, comp: true },
+    { k: 'protein', label: 'Protein', unit: '%', min: 5, max: 30, comp: true }
   ];
-  var SRC = { manual: 'Entered here', health: 'Health Connect', csv: 'CSV import' };
+  var REPORT_KEYS = ['weight', 'fat', 'muscle', 'smm', 'water', 'visceral', 'bmr', 'bone', 'protein'];
+  var SRC = { manual: 'Entered here', health: 'Health Connect', csv: 'CSV import', xiaomi: 'Xiaomi report' };
+  function bfLabel(x) { return x.label + (x.unit ? ' (' + x.unit + ')' : ''); }
+  function bfShort(x, v) {
+    return x.k === 'weight' ? fmt(v) + ' kg' : x.k === 'fat' ? fmt(v) + '% fat' : x.k === 'visceral' ? 'visceral ' + fmt(v)
+      : x.label.toLowerCase() + ' ' + fmt(v) + (x.unit && !x.comp ? '' : x.unit === '%' ? '%' : x.unit ? ' ' + x.unit : '');
+  }
   function bodyDocs() {
     return Object.keys(state.body).map(function (k) { return state.body[k]; }).filter(function (b) { return b && b.date; })
       .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
@@ -1794,11 +2129,11 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
       BF.forEach(function (f) {
         var v = inc[f.k];
         if (v == null || !(v >= f.min && v <= f.max)) return;
-        if (ex && ex[f.k] != null && ex.src === 'manual') return;
+        if (ex && ex[f.k] != null && (ex.src === 'manual' || ex.src === 'xiaomi')) return;
         if (nd[f.k] !== v) { nd[f.k] = v; changed = true; }
       });
       if (!changed) return;
-      nd.src = ex && ex.src === 'manual' ? 'manual' : src;
+      nd.src = ex && (ex.src === 'manual' || ex.src === 'xiaomi') ? ex.src : src;
       nd.updated = Date.now();
       docs.push(nd);
     });
@@ -1944,7 +2279,7 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
     });
   }
   function bodyCsvText() {
-    var rows = [['date'].concat(BF.map(function (x) { return x.k + (x.unit === '%' ? '_pct' : '_' + x.unit); })).concat(['source'])];
+    var rows = [['date'].concat(BF.map(function (x) { return x.k + (x.unit === '%' ? '_pct' : x.unit ? '_' + x.unit : ''); })).concat(['source'])];
     bodyDocs().forEach(function (d) {
       rows.push([d.date].concat(BF.map(function (x) { return d[x.k] == null ? '' : d[x.k]; })).concat([d.src || '']));
     });
@@ -1977,6 +2312,15 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
           tile('30 days', w30 ? signed(lw.weight - w30.weight) : '–', w30 ? 'kg' : ''),
           tile('Body fat', lf ? fmt(lf.fat) : '–', lf ? '%' : '', lf ? fmtShort(lf.date) : null))));
     }
+    var lc = docs.filter(function (d) { return d.muscle != null || d.smm != null || d.visceral != null; }).pop();
+    if (lc) {
+      kids.push(h('section', { class: 'panel' },
+        h('h2', { text: 'Body composition' }),
+        h('p', { class: 'subnote', text: 'Latest scale reading, ' + fmtShort(lc.date) }),
+        h('div', { class: 'tiles t4' }, BF.filter(function (x) { return x.comp && lc[x.k] != null; }).map(function (x) {
+          return tile(x.label, fmt(lc[x.k]), x.unit);
+        }))));
+    }
     var availM = BF.filter(function (x) { return docs.some(function (d) { return d[x.k] != null; }); });
     if (availM.length) {
       if (!availM.some(function (x) { return x.k === state.bmetric; })) state.bmetric = availM[0].k;
@@ -1987,7 +2331,7 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
         h('div', { class: 'seg', role: 'group', 'aria-label': 'Measurement' }, availM.map(function (x) {
           return h('button', { type: 'button', 'aria-pressed': String(x.k === state.bmetric), text: x.label, onclick: function () { state.bmetric = x.k; renderBody(); } });
         })),
-        h('h2', { text: bm.label + ' (' + bm.unit + ')' }),
+        h('h2', { text: bfLabel(bm) }),
         h('div', { class: 'chart', id: 'bchart' })));
     } else {
       state.charts.bchart = null;
@@ -1995,15 +2339,20 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
         h('h2', { text: 'No measurements yet' }),
         h('p', { text: 'Add your weight below, or import it. Your trend chart appears here.' })));
     }
+    if (state.report) kids.push(reportPanel());
     var f = state.bform, cur = state.body['b_' + f.date];
     var form = h('div', { class: 'bform' },
       h('label', { class: 'lbl full', for: 'bdate' }, 'Date',
         h('input', { type: 'date', id: 'bdate', value: f.date, onchange: function (ev) { state.bform = { date: ev.target.value }; renderBody(); } })),
-      BF.map(function (x) {
-        var val = f[x.k] != null ? f[x.k] : (cur && cur[x.k] != null ? String(cur[x.k]) : '');
-        return h('label', { class: 'lbl', for: 'bf_' + x.k }, x.label + ' (' + x.unit + ')',
-          h('input', { type: 'text', inputmode: 'decimal', id: 'bf_' + x.k, autocomplete: 'off', value: val, oninput: function (ev) { f[x.k] = ev.target.value; } }));
-      }));
+      BF.filter(function (x) { return !x.comp; }).map(bfInput),
+      h('details', { class: 'paste full', open: BF.some(function (x) { return x.comp && cur && cur[x.k] != null; }) || null },
+        h('summary', { text: 'Body composition (from a smart scale)' }),
+        h('div', { class: 'bform' }, BF.filter(function (x) { return x.comp; }).map(bfInput))));
+    function bfInput(x) {
+      var val = f[x.k] != null ? f[x.k] : (cur && cur[x.k] != null ? String(cur[x.k]) : '');
+      return h('label', { class: 'lbl', for: 'bf_' + x.k }, bfLabel(x),
+        h('input', { type: 'text', inputmode: 'decimal', id: 'bf_' + x.k, autocomplete: 'off', value: val, oninput: function (ev) { f[x.k] = ev.target.value; } }));
+    }
     kids.push(h('section', { class: 'panel' },
       h('h2', { text: cur ? 'Edit ' + fmtShort(f.date) : 'Add measurement' }),
       form,
@@ -2020,13 +2369,14 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
     var paste = h('textarea', { id: 'bpaste', placeholder: 'Date,Weight,BodyFat\n2026-10-20,82.4,18.1' });
     kids.push(h('section', { class: 'panel' },
       h('h2', { text: 'Import' }),
+      reportImportBlock(),
       NATIVE && NATIVE.healthImport
         ? h('div', { class: 'opts' },
             h('p', { text: 'Health Connect: reads weight and body fat that other apps save there, such as Samsung Health (including body composition from your Galaxy Watch) or Zepp Life.' }),
             h('div', { class: 'acts' }, h('button', { type: 'button', class: 'btn', text: 'Import from Health Connect', onclick: healthImport })),
             h('p', { class: 'msg', 'aria-live': 'polite', text: state.healthMsg || '' }))
         : h('p', { class: 'muted', text: 'Health Connect import works in the Lift Log Android app.' }),
-      h('p', { class: 'subnote', text: 'Xiaomi Home does not share scale data with other apps on Android. To bring it in, export it to a CSV file and import that here. Columns needed: date and weight, body fat optional.' }),
+      h('p', { class: 'subnote', text: 'CSV file: columns for date and weight, body fat optional.' }),
       h('label', { class: 'lbl', for: 'bfile' }, 'CSV file', fileIn),
       h('details', { class: 'paste' }, h('summary', { text: 'Or paste CSV text' }),
         h('label', { class: 'lbl', for: 'bpaste' }, 'CSV text', paste),
@@ -2038,9 +2388,7 @@ details.paste summary { cursor: pointer; font-size: 14px; color: var(--muted); m
           h('button', { type: 'button', class: 'btn small', text: 'Export CSV', onclick: function () { exportCsv('lift-log-body-' + todayISO() + '.csv', bodyCsvText(), $('#bmsg')); } })),
         h('p', { class: 'msg', id: 'bmsg', 'aria-live': 'polite' }),
         h('div', { class: 'blist' }, docs.slice().reverse().slice(0, 40).map(function (d) {
-          var parts = BF.filter(function (x) { return d[x.k] != null; }).map(function (x) {
-            return x.k === 'weight' ? fmt(d.weight) + ' kg' : x.k === 'fat' ? fmt(d.fat) + '% fat' : x.label.toLowerCase() + ' ' + fmt(d[x.k]);
-          });
+          var parts = BF.filter(function (x) { return d[x.k] != null; }).map(function (x) { return bfShort(x, d[x.k]); });
           var confirming = state.confirmBody === d.id;
           return h('div', { class: 'brow' },
             h('span', { class: 'dt', text: fmtShort(d.date) }),
