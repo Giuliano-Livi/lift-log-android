@@ -3035,7 +3035,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
 
   /* reading a Macros screenshot: the phone app reads the text on the device, the web page asks Claude */
   var DIET_LABELS = {
-    kcal: [['eaten'], ['consumed'], ['calories'], ['kcal'], ['energy'], ['food']],
+    kcal: [['eaten'], ['consumed'], ['calories'], ['energy']],
     p: [['protein'], ['proteins'], ['proteine'], ['proteínas']],
     c: [['carbs'], ['carbohydrates'], ['carbohydrate'], ['carb'], ['carboidrati']],
     f: [['fat'], ['fats'], ['grassi'], ['lipids']]
@@ -3057,25 +3057,62 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     });
     return best;
   }
+  /* Macros puts the day's totals at the top: "Carbohydrate  Protein  Fat" over "276 / 423 g" (eaten / goal),
+     then "2520 / 3050 kcal". Per-meal totals further down repeat the same labels, so the first ones win. */
+  function kcalRow(rows) {
+    var out = null;
+    rows.some(function (ws) {
+      if (!ws.some(function (w) { return /kcal/i.test(w.t); })) return false;
+      return ws.some(function (w, i) {
+        if (!/\d/.test(w.t)) return false;
+        var t = w.t, nx = ws[i + 1];
+        if (/^\d{1,2}$/.test(t) && nx && /^\d{3}\b/.test(nx.t)) t += nx.t;   // "2 520" read as two words
+        var n = numIn(t.replace(/[.,](?=\d{3}\b)/g, ''));
+        if (n >= 100 && n <= 15000) { out = Math.round(n); return true; }
+        return false;
+      });
+    });
+    return out;
+  }
+  var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+    gen: 1, mag: 5, giu: 6, lug: 7, ago: 8, set: 9, ott: 10, dic: 12 };
+  var WEEKDAYS = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  /* "Tue, 2 Dec", "Dec 2", "2 December 2025", "Today", "Yesterday" near the top of the screenshot */
+  function dietDate(rows, height) {
+    var top = rows.filter(function (ws) { return ws[0].y < (height || 2400) * 0.2; }), out = null, today = todayISO();
+    top.some(function (ws) {
+      var text = ws.map(function (w) { return w.t; }).join(' ').toLowerCase(), m, d = null, mo = null, y = null, wd = null;
+      if (/\btoday\b|\boggi\b/.test(text)) { out = today; return true; }
+      if (/\byesterday\b|\bieri\b/.test(text)) { out = addDays(today, -1); return true; }
+      if ((m = /\b(\d{1,2})\s+([a-z]{3})[a-z]*\.?(?:\s+(\d{4}))?/.exec(text)) && MONTHS[m[2]]) { d = +m[1]; mo = MONTHS[m[2]]; y = m[3] ? +m[3] : null; }
+      else if ((m = /\b([a-z]{3})[a-z]*\.?\s+(\d{1,2})\b(?:,?\s+(\d{4}))?/.exec(text)) && MONTHS[m[1]]) { d = +m[2]; mo = MONTHS[m[1]]; y = m[3] ? +m[3] : null; }
+      if (!d || d > 31) return false;
+      var w = /\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/.exec(text);
+      if (w) wd = WEEKDAYS[w[1]];
+      var yr = +today.slice(0, 4);
+      for (var k = 0; k < 8; k++) {
+        var cy = y || yr - k, s1 = cy + '-' + pad(mo) + '-' + pad(d), dt = parseISO(s1);
+        if (dt.getMonth() + 1 !== mo) break;
+        if ((y || s1 <= today) && (wd == null || dt.getDay() === wd)) { out = s1; return true; }
+        if (y) break;
+      }
+      return false;
+    });
+    return out;
+  }
   function parseMacros(ocr) {
     var rows = reportWords(ocr), v = {};
+    var k = kcalRow(rows);
+    if (k != null) v.kcal = k;
     DF.forEach(function (f) {
+      if (f.k === 'kcal' && v.kcal != null) return;
       var lab = null;
       DIET_LABELS[f.k].some(function (pat) { lab = findLabel(rows, { pats: [pat] }); return !!lab; });
       if (!lab) return;
       var val = nearestNumber(rows, lab, f);
       if (val != null) v[f.k] = f.int ? Math.round(val) : rnd(val);
     });
-    if (v.kcal == null) {
-      // a lone "1,850 kcal" without a label
-      rows.some(function (ws) { return ws.some(function (w, i) {
-        var nx = ws[i + 1], t = w.t + (nx ? ' ' + nx.t : '');
-        var m = /(\d[\d.,]{2,})\s*kcal/i.exec(t);
-        if (m) { var n = num(m[1].replace(/[.,](?=\d{3}\b)/g, '')); if (n >= 100 && n <= 15000) { v.kcal = Math.round(n); return true; } }
-        return false;
-      }); });
-    }
-    v.date = reportDate(rows);
+    v.date = dietDate(rows, ocr.height) || reportDate(rows);
     return v;
   }
   function openDietReview(v, how) {
@@ -3109,8 +3146,10 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     try { NATIVE.ocrPickImage(); } catch (e) { state.ocrMode = null; state.dietMsg = 'Could not open the image picker.'; renderBody(); }
   }
   var DIET_PROMPT = 'This image is a screenshot from a calorie counting app (usually "Macros") showing one day of food. ' +
+    'In Macros the day totals are at the top: Carbohydrate, Protein and Fat as eaten / goal in grams, then calories as eaten / goal kcal; ' +
+    'the totals under each meal (Colazione, Pranzo...) are only for that meal, so ignore them. ' +
     'Reply with only a JSON object with these keys, plain numbers without units, or null when not shown: ' +
-    '"date" (the day shown, YYYY-MM-DD, null if it says today or no date is visible), "kcal" (calories eaten that day, not the goal and not the calories left), ' +
+    '"date" (the day shown at the top, YYYY-MM-DD; when it has no year, use the latest such date that is not after ' + todayISO() + '; null if it says today), "kcal" (calories eaten that day, not the goal and not the calories left), ' +
     '"p" (protein eaten, grams), "c" (carbohydrates eaten, grams), "f" (fat eaten, grams). ' +
     'When a value is shown as eaten / goal, use the eaten number. Example: {"date":null,"kcal":2140,"p":152,"c":231,"f":68}';
   function readDietWithClaude(file) {
