@@ -388,6 +388,33 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        /** Share a PNG the page drew (the monthly report) through Android's share sheet. */
+        public void shareImage(final String filename, final String base64) {
+            DataStore.runInBackground(() -> {
+                try {
+                    byte[] png = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+                    java.io.File dir = new java.io.File(getCacheDir(), "shared");
+                    if (!dir.exists() && !dir.mkdirs()) throw new java.io.IOException("no cache folder");
+                    String safe = filename.replaceAll("[^A-Za-z0-9._-]", "_");
+                    java.io.File f = new java.io.File(dir, safe.endsWith(".png") ? safe : safe + ".png");
+                    try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) {
+                        out.write(png);
+                    }
+                    Uri uri = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".files", f);
+                    runOnUiThread(() -> {
+                        Intent send = new Intent(Intent.ACTION_SEND);
+                        send.setType("image/png");
+                        send.putExtra(Intent.EXTRA_STREAM, uri);
+                        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(send, "Share report"));
+                    });
+                } catch (Exception e) {
+                    // the page shows that sharing did not start
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void shareText(final String filename, final String text) {
             runOnUiThread(() -> {
                 Intent send = new Intent(Intent.ACTION_SEND);

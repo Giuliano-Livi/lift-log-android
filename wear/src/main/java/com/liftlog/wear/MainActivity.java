@@ -3,6 +3,7 @@ package com.liftlog.wear;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Canvas;
@@ -237,6 +238,43 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         fetchPhoneState();
         handler.post(tick);
         render();
+        handleLaunch(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleLaunch(intent);
+    }
+
+    /** The tile's Start button opens the app with the day to start. */
+    private void handleLaunch(Intent intent) {
+        String start = intent != null ? intent.getStringExtra("start") : null;
+        if (start == null || start.isEmpty()) return;
+        intent.removeExtra("start");
+        if (isRunning() && start.equals(dayId)) {
+            screen = "workout";
+            exIdx = firstOpenExercise();
+            editKey = null;
+            render();
+            return;
+        }
+        startSession(findDay(start, null, -1));
+    }
+
+    private String glanceSig = "";
+
+    /** Tell the tile and the watch-face complication when what they show has changed (and only then). */
+    private void publishGlance() {
+        prefs.edit().putLong("restEnd", restEnd).apply();
+        Day sug = suggestedDay(days());
+        String sig = isRunning() + "|" + dayId + "|" + startedAt + "|" + restEnd + "|" + (sug != null ? sug.id + sug.label + sug.tone + orderOf(phone, sug.id).size() : "")
+            + "|" + phone.optString("planName", "") + "|" + today();
+        if (sig.equals(glanceSig)) return;
+        glanceSig = sig;
+        TodayTileService.refresh(this);
+        RestComplicationService.refresh(this);
     }
 
     @Override
@@ -258,6 +296,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     public void onBackPressed() {
         if (!"home".equals(screen)) {
             restEnd = 0;
+            publishGlance();
             screen = "home";
             render();
         } else {
@@ -379,6 +418,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         }
         saveSession();
         if (!"rest".equals(screen)) render();
+        publishGlance();
     }
 
     private JSONObject phoneSession(String id) {
@@ -586,6 +626,10 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
 
     /** Days of the plan in use, as sent by the phone (the built-in plan before the first sync). */
     private List<Day> days() {
+        return daysOf(phone);
+    }
+
+    static List<Day> daysOf(JSONObject phone) {
         List<Day> l = new ArrayList<>();
         JSONArray a = phone.optJSONArray("days");
         if (a != null) {
@@ -616,10 +660,10 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     }
 
     private boolean hasExercises(Day d) {
-        return !defaultOrder(d.id).isEmpty();
+        return !orderOf(phone, d.id).isEmpty();
     }
 
-    private static String today() {
+    static String today() {
         return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
     }
 
@@ -638,6 +682,10 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
      * go round in order (the day after the last one you trained, or the same day if that was today).
      */
     private Day suggestedDay(List<Day> ds) {
+        return suggestedOf(phone, ds);
+    }
+
+    static Day suggestedOf(JSONObject phone, List<Day> ds) {
         if (ds.isEmpty()) return null;
         int start = 0;
         if (phone.optBoolean("rot", false)) {
@@ -656,12 +704,16 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         }
         for (int k = 0; k < ds.size(); k++) {
             Day d = ds.get((start + k) % ds.size());
-            if (hasExercises(d)) return d;
+            if (!orderOf(phone, d.id).isEmpty()) return d;
         }
         return null;
     }
 
     private List<String> defaultOrder(String id) {
+        return orderOf(phone, id);
+    }
+
+    static List<String> orderOf(JSONObject phone, String id) {
         JSONObject plan = phone.optJSONObject("plan");
         List<String> l = plan != null ? readIds(plan.optJSONArray(id)) : new ArrayList<>();
         int bi = builtinIndex(id);
@@ -802,6 +854,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         if (startedAt == 0) startedAt = System.currentTimeMillis();
         endedAt = 0;
         saveSession();
+        publishGlance();
         sendOp("start", null);
         exIdx = firstOpenExercise();
         editKey = null;
@@ -844,6 +897,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         }
         restEnd = System.currentTimeMillis() + rest * 1000L;
         restTotal = Math.max(1, rest);
+        publishGlance();
         screen = "rest";
         render();
     }
@@ -851,6 +905,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
     private void finishSession(boolean show) {
         endedAt = System.currentTimeMillis();
         restEnd = 0;
+        publishGlance();
         stopHr();
         saveSession();
         sendOp("finish", null);
@@ -879,6 +934,7 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
             long rem = restEnd - now;
             if (rem <= 0) {
                 restEnd = 0;
+                publishGlance();
                 recordText = null;
                 buzz(new long[]{0, 300, 150, 300, 150, 300});
                 screen = "workout";
@@ -1248,13 +1304,14 @@ public class MainActivity extends Activity implements DataClient.OnDataChangedLi
         row.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         lp.rightMargin = dp(4);
-        row.addView(button("−15s", GREY, WHITE, v -> { restEnd -= 15000; restTotal = Math.max(1, restTotal - 15); }), lp);
+        row.addView(button("−15s", GREY, WHITE, v -> { restEnd -= 15000; restTotal = Math.max(1, restTotal - 15); publishGlance(); }), lp);
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         rp.leftMargin = dp(4);
-        row.addView(button("+15s", GREY, WHITE, v -> { restEnd += 15000; restTotal += 15; }), rp);
+        row.addView(button("+15s", GREY, WHITE, v -> { restEnd += 15000; restTotal += 15; publishGlance(); }), rp);
         c.addView(row, full(10));
         c.addView(primary("Skip rest", tone, v -> {
             restEnd = 0;
+            publishGlance();
             recordText = null;
             screen = "workout";
             render();

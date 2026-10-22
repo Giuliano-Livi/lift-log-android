@@ -18,6 +18,12 @@ Every push to `main` builds a new APK automatically (Actions > Build APK).
 - Watch to phone: each saved set is queued and applied the next time the phone app is open.
 - Phone to watch: previous sets, rest times and today's sessions are sent whenever the phone app saves.
 
+On the watch, also:
+- a tile (swipe from the watch face, add "Lift Log"): today's workout with a Start button, or the running
+  workout with Continue;
+- a complication for watch faces that accept them ("Lift Log rest timer"): the rest countdown while
+  resting, the workout clock during a workout, otherwise today's day. The watch face draws the countdown.
+
 Install once with ADB over Wi-Fi: on the watch enable Developer options (Settings > About watch >
 Software information > tap Software version 5 times), then turn on ADB debugging and Wireless
 debugging. From a computer with Android platform-tools:
@@ -34,6 +40,14 @@ debugging. From a computer with Android platform-tools:
   that looks the exercise up on JEFIT.
 - Records, weight suggestions and progress belong to each exercise, so they carry over between plans.
   Deleting a plan you trained with only hides it; its sessions stay in History.
+
+## Progress
+- Muscles: a front and back body map coloured by sets this week against the plan, or by the plan's weekly
+  sets (10–20 hard sets a week is the usual growth range). Tapping a muscle lists the plan's exercises for
+  it and, when it gets under 10 sets, suggestions from the library.
+- Strength and body weight: estimated 1RM per kg of body weight for the main lifts over the last 8 weeks,
+  also as a chart metric and next to each record.
+- Monthly report: sessions, records, lifts, body and diet for a month, shareable as an image.
 
 ## Diet
 Body > Diet keeps one line per day: calories, protein, carbs and fat. Food logging stays in Macros (or

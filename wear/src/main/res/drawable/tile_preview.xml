@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- tile picker preview: a dark round face with the day button -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp" android:height="192dp" android:viewportWidth="192" android:viewportHeight="192">
+    <path android:fillColor="#FF0B0E1A" android:pathData="M96,0a96,96 0,1 1,0 192a96,96 0,1 1,0 -192z" />
+    <path android:fillColor="#FF8B91AA" android:pathData="M70,52h52v6h-52z" />
+    <path android:fillColor="#FFF2F3F9" android:pathData="M56,72h80v14h-80z" />
+    <path android:fillColor="#FF8B91AA" android:pathData="M72,94h48v6h-48z" />
+    <path android:fillColor="#FF8B7CF8" android:pathData="M56,116h80a22,22 0,0 1,0 44h-80a22,22 0,0 1,0 -44z" />
+</vector>

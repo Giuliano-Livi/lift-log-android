@@ -402,6 +402,30 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .adh .c { font-size: 11px; font-weight: 600; }
 .adh .l { font-size: 10px; color: var(--faint); white-space: nowrap; }
 
+/* progress: strength per kilo */
+.srows { display: grid; }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) 62px 62px 52px; gap: 8px; align-items: center; padding: 10px 0; border: 0; border-top: 1px solid var(--line);
+  background: none; color: var(--ink); text-align: right; font-size: 13.5px; font-weight: 500; }
+.srow.head { border-top: 0; font-size: 11.5px; color: var(--muted); font-weight: 600; padding-top: 0; }
+.srow > span:first-child { text-align: left; }
+.srow .sn2 { line-height: 1.3; }
+.srow .up { color: #7fe0b2; }
+.srow .dn { color: #ff9aac; }
+
+/* progress: body map */
+.bmap { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bmap figure { margin: 0; display: grid; justify-items: center; gap: 4px; }
+.bmap svg { width: 100%; max-width: 170px; height: auto; }
+.bmap figcaption { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); }
+.bmap .base { fill: var(--surface2); }
+.bmap .m { stroke: var(--surface); stroke-width: .7; cursor: pointer; }
+.bmap .m.sel { stroke: #fff; stroke-width: 1.3; }
+.bmleg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.bmleg span { display: inline-flex; align-items: center; gap: 6px; }
+.bmleg i { width: 10px; height: 10px; border-radius: 3px; display: block; }
+.bmh { font-size: 16px; font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) { .bmap .m { transition: fill .2s; } }
+
 /* progress: lift trend + records */
 .picker { display: grid; gap: 10px; }
 .picker select { width: 100%; font-weight: 500; }
@@ -427,6 +451,7 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .rows { display: grid; }
 .row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
 .row:first-child { border-top: 0; }
+.row.r1 { grid-template-columns: 1fr; }
 .row .dt { color: var(--muted); }
 .recs { display: grid; gap: 8px; }
 .rec { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 12px 14px; border-radius: 16px; background: var(--surface2); font-size: 13.5px; }
@@ -625,21 +650,21 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   C('ez-curl', 'EZ-Bar Curl', 'curl', 'biceps', 2.5);
   C('db-curl', 'Dumbbell Curl', 'curl', 'biceps', 1);
   C('hammer-curl', 'Dumbbell Hammer Curl', 'curl', 'biceps', 1);
-  C('squat', 'Barbell Squat', 'squat', 'quads', 5);
-  C('smith-squat', 'Smith Machine Squat', 'squat', 'quads', 5);
-  C('leg-press', 'Leg Press', 'seatpress', 'quads', 5);
-  C('rdl', 'Romanian Deadlift', 'hinge', 'hams', 5);
-  C('db-rdl', 'Dumbbell Romanian Deadlift', 'hinge', 'hams', 2);
-  C('back-ext', '45° Back Extension', 'hinge', 'hams', 2.5, true);
-  C('hack', 'Hack Squat', 'squat', 'quads', 5);
-  C('pendulum', 'Pendulum Squat', 'squat', 'quads', 5);
-  C('bulgarian', 'Bulgarian Split Squat', 'squat', 'quads', 2);
+  C('squat', 'Barbell Squat', 'squat', 'quads glutes', 5);
+  C('smith-squat', 'Smith Machine Squat', 'squat', 'quads glutes', 5);
+  C('leg-press', 'Leg Press', 'seatpress', 'quads glutes', 5);
+  C('rdl', 'Romanian Deadlift', 'hinge', 'hams glutes', 5);
+  C('db-rdl', 'Dumbbell Romanian Deadlift', 'hinge', 'hams glutes', 2);
+  C('back-ext', '45° Back Extension', 'hinge', 'hams glutes', 2.5, true);
+  C('hack', 'Hack Squat', 'squat', 'quads glutes', 5);
+  C('pendulum', 'Pendulum Squat', 'squat', 'quads glutes', 5);
+  C('bulgarian', 'Bulgarian Split Squat', 'squat', 'quads glutes', 2);
   C('leg-curl', 'Machine Seated Leg Curl', 'legcurl', 'hams', 2.5);
   C('lying-curl', 'Lying Leg Curl', 'legcurl', 'hams', 2.5);
   C('standing-curl', 'Standing Single-Leg Curl', 'legcurl', 'hams', 2.5);
   C('leg-ext', 'Machine Leg Extension', 'legext', 'quads', 2.5);
   C('sissy', 'Sissy Squat', 'squat', 'quads', 2.5, true);
-  C('goblet', 'Goblet Squat', 'squat', 'quads', 2);
+  C('goblet', 'Goblet Squat', 'squat', 'quads glutes', 2);
   C('seated-calf', 'Machine Seated Calf Raise', 'seatcalf', 'calves', 5);
   C('leg-press-calf', 'Leg Press Calf Raise', 'seatcalf', 'calves', 5);
   C('standing-calf', 'Standing Calf Raise Machine', 'standcalf', 'calves', 5);
@@ -927,7 +952,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     busy: 0, kind: 'connecting', status: 'connecting', progEx: null, metric: null, charts: {},
     week: weekStartOf(todayISO()), bmetric: 'weight', bform: null, confirmDel: null, confirmBody: null,
     settings: { rest: {}, swaps: {}, deloads: [], plans: {}, activePlan: BUILTIN_ID },
-    editPlan: null, pick: null, lib: { q: '', m: 'all', eq: 'all', open: null }, howOpen: null, confirmPlan: null, confirmDay: null,
+    editPlan: null, pick: null, bmMode: 'week', bmSel: null, lib: { q: '', m: 'all', eq: 'all', open: null }, howOpen: null, confirmPlan: null, confirmDay: null,
     restT: null, autoRest: true, sound: true, confirmReset: false, swapOpen: null, swapAlways: false,
     healthMsg: '', healthSilent: false, importMsg: '', report: null, reportMsg: '', vision: null,
     loaded: false, dataMsg: '', backup: null, dayPicked: false,
@@ -1146,7 +1171,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
           if (!(s.w > 0) && s.r > bestR) { bestR = s.r; dR = p.date; }
         });
       });
-      if (bestE > 0) return { id: id, name: exName(id), val: 'Est. 1RM ' + fmt(bestE) + ' kg', sub: fmt(bestSet.w) + ' kg × ' + bestSet.r, date: dE, isNew: dE >= weekAgo };
+      var bwE = bestE > 0 ? weightOn(dE) : null;
+      if (bestE > 0) return { id: id, name: exName(id), val: 'Est. 1RM ' + fmt(bestE) + ' kg', sub: fmt(bestSet.w) + ' kg × ' + bestSet.r + (bwE ? ' · ' + fmt2(bestE / bwE) + '× body weight' : ''), date: dE, isNew: dE >= weekAgo };
       if (bestR > 0) return { id: id, name: exName(id), val: bestR + ' reps', sub: 'Bodyweight', date: dR, isNew: dR >= weekAgo };
       return null;
     }).filter(Boolean).sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
@@ -2038,28 +2064,85 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   }
 
   /* ---------- charts ---------- */
+  /* body weight on a date: the last weigh-in up to 3 weeks before, else the first one up to a week after */
+  function weightOn(date) {
+    var best = null, after = null;
+    bodyDocs().forEach(function (d) {
+      if (d.weight == null) return;
+      if (d.date <= date) { if (d.date >= addDays(date, -21)) best = d; }
+      else if (!after && d.date <= addDays(date, 7)) after = d;
+    });
+    return (best || after) ? (best || after).weight : null;
+  }
   function seriesFor(id) {
     var pts = [];
     sessionDocs().forEach(function (doc) {
       var s = validSets(doc, id);
       if (!s.length) return;
-      pts.push({
+      var p = {
         date: doc.date, t: parseISO(doc.date).getTime(), sets: s,
         top: Math.max.apply(null, s.map(function (x) { return x.w; })),
         e1: Math.max.apply(null, s.map(function (x) { return e1(x.w, x.r); })),
         vol: s.reduce(function (a, x) { return a + x.w * x.r; }, 0),
         reps: Math.max.apply(null, s.map(function (x) { return x.r; }))
-      });
+      };
+      var bw = p.e1 > 0 ? weightOn(doc.date) : null;
+      p.rel = bw ? Math.round(p.e1 / bw * 100) / 100 : null;
+      pts.push(p);
     });
     pts.sort(function (a, b) { return a.t - b.t; });
     return pts;
   }
+  function fmt2(n) { return (Math.round(n * 100) / 100).toFixed(2); }
   var METRICS = {
     e1: { label: 'Est. 1RM', unit: 'kg', key: 'e1', weighted: true },
+    rel: { label: 'Per kg body weight', unit: '× BW', key: 'rel', weighted: true, f: fmt2 },
     top: { label: 'Top weight', unit: 'kg', key: 'top', weighted: true },
     vol: { label: 'Volume', unit: 'kg', key: 'vol', weighted: true },
     reps: { label: 'Best set reps', unit: 'reps', key: 'reps', weighted: false }
   };
+  /* strength against body weight over the last 8 weeks: did the lifts hold up while the weight changed? */
+  function strengthVsWeight() {
+    var from = addDays(todayISO(), -56), rows = [];
+    loggedIds().forEach(function (id) {
+      var pts = seriesFor(id).filter(function (p) { return p.date >= from && p.e1 > 0 && p.rel; });
+      if (pts.length < 3) return;
+      var k = pts.length >= 4 ? 2 : 1;
+      var a = pts.slice(0, k), b = pts.slice(-k);
+      var e0 = mean(a.map(function (p) { return p.e1; })), e2 = mean(b.map(function (p) { return p.e1; }));
+      var r0 = mean(a.map(function (p) { return p.rel; })), r2 = mean(b.map(function (p) { return p.rel; }));
+      rows.push({ id: id, n: pts.length, e: (e2 / e0 - 1) * 100, r: (r2 / r0 - 1) * 100, rel: pts[pts.length - 1].rel, first: pts[0].date, last: pts[pts.length - 1].date });
+    });
+    rows.sort(function (x, y) { return y.n - x.n; });
+    rows = rows.slice(0, 5);
+    if (!rows.length) return null;
+    var first = rows.reduce(function (m, r) { return r.first < m ? r.first : m; }, rows[0].first), w0 = weightOn(first), w1 = weightOn(todayISO());
+    return { rows: rows, w0: w0, w1: w1 };
+  }
+  function pct(n) { var v = Math.round(n * 10) / 10; return (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v) + '%'; }
+  function strengthPanel() {
+    var sv = strengthVsWeight();
+    if (!sv) return null;
+    var dw = sv.w0 && sv.w1 ? sv.w1 - sv.w0 : null;
+    var kept = sv.rows.filter(function (r) { return r.e >= -2; }).length, up = sv.rows.filter(function (r) { return r.r > 1; }).length;
+    var summary = (dw != null ? 'Body weight ' + signed(dw, 'kg') + ' (' + pct(dw / sv.w0 * 100) + ') in this time. ' : '') +
+      (dw != null && dw < -0.5 ? 'You kept your strength on ' + kept + ' of ' + sv.rows.length + ' lifts while losing weight' + (up ? ', and got stronger per kilo on ' + up + '.' : '.')
+        : dw != null && dw > 0.5 ? (up ? 'Strength per kilo went up on ' + up + ' of ' + sv.rows.length + ' lifts, so the weight you gained came with strength.' : 'Strength per kilo did not keep up with the weight you gained.')
+        : 'Your weight is about stable, so strength and strength per kilo move together.');
+    return h('section', { class: 'panel' },
+      h('h2', { text: 'Strength and body weight' }),
+      h('p', { class: 'subnote', text: 'Last 8 weeks, first sessions against the latest ones. Per kg is the estimated 1RM divided by your weight that day.' }),
+      h('div', { class: 'srows' },
+        h('div', { class: 'srow head' }, h('span', { text: 'Lift' }), h('span', { text: '1RM' }), h('span', { text: 'Per kg' }), h('span', { text: 'Now' })),
+        sv.rows.map(function (r) {
+          return h('button', { type: 'button', class: 'srow', onclick: function () { state.progEx = r.id; state.metric = 'rel'; renderProgress(); var el = document.getElementById('pex'); if (el) el.scrollIntoView({ block: 'center' }); } },
+            h('span', { class: 'sn2', text: exName(r.id) }),
+            h('span', { class: r.e >= 0 ? 'up' : r.e < -2 ? 'dn' : '', text: pct(r.e) }),
+            h('span', { class: r.r >= 0 ? 'up' : r.r < -2 ? 'dn' : '', text: pct(r.r) }),
+            h('span', { text: fmt2(r.rel) + '×' }));
+        })),
+      h('p', { class: 'subnote', text: summary }));
+  }
   function niceNum(x) {
     var exp = Math.floor(Math.log10(x)), f = x / Math.pow(10, exp);
     var nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
@@ -2114,7 +2197,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     ticks.forEach(function (tv) {
       var y = Y(tv).toFixed(1);
       s += '<line class="gl" x1="' + ml + '" x2="' + (W - mr) + '" y1="' + y + '" y2="' + y + '"/>';
-      s += '<text class="tx" x="' + (ml - 8) + '" y="' + (Number(y) + 4) + '" text-anchor="end">' + fmt(tv) + '</text>';
+      s += '<text class="tx" x="' + (ml - 8) + '" y="' + (Number(y) + 4) + '" text-anchor="end">' + (c.f || fmt)(tv) + '</text>';
     });
     var P = pts.map(function (p) { return { x: X(p.t), y: Y(p.v) }; });
     if (P.length > 1) {
@@ -2122,7 +2205,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       s += '<path fill="url(#' + gid + ')" d="' + line + ' L' + P[P.length - 1].x.toFixed(1) + ',' + base + ' L' + P[0].x.toFixed(1) + ',' + base + ' Z"/>';
       s += '<path class="ln" d="' + line + '"/>';
     }
-    var lp = P[P.length - 1], lv = fmt(vals[vals.length - 1]);
+    var lp = P[P.length - 1], lv = (c.f || fmt)(vals[vals.length - 1]);
     s += '<line class="guide" x1="' + lp.x.toFixed(1) + '" x2="' + lp.x.toFixed(1) + '" y1="' + lp.y.toFixed(1) + '" y2="' + base + '"/>';
     s += '<circle class="pt" cx="' + lp.x.toFixed(1) + '" cy="' + lp.y.toFixed(1) + '" r="6.5"/>';
     var bw = Math.max(44, lv.length * 8 + 22), bx = Math.min(W - mr - bw, Math.max(ml, lp.x - bw / 2)), by = Math.max(4, lp.y - 40);
@@ -2178,6 +2261,312 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     });
     return out;
   }
+  /* ---------- monthly report: one page per month, shared as an image ---------- */
+  function monthBounds(m) {
+    var first = m + '-01', d = parseISO(first);
+    d.setMonth(d.getMonth() + 1); d.setDate(0);
+    var last = iso(d), today = todayISO();
+    return { first: first, last: last, end: last < today ? last : today };
+  }
+  function monthLabel(m) { return parseISO(m + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); }
+  function addMonths(m, n) { var d = parseISO(m + '-01'); d.setMonth(d.getMonth() + n); return iso(d).slice(0, 7); }
+  function durText(ms) { var m = Math.round(ms / 60000), hh = Math.floor(m / 60); return hh ? hh + 'h ' + pad(m % 60) + 'm' : m + ' min'; }
+  function monthReport(m) {
+    var b = monthBounds(m), inM = function (d) { return d >= b.first && d <= b.last; };
+    var r = { month: m, label: monthLabel(m), b: b };
+    var docs = sessionDocs().filter(function (d) { return inM(d.date) && docKeys(d).length; }).sort(function (x, y) { return x.date < y.date ? -1 : 1; });
+    var sets = 0, vol = 0, ms = 0, muscles = {}, recs = [];
+    docs.forEach(function (d) {
+      docKeys(d).forEach(function (k) {
+        var s = validSets(d, k);
+        sets += s.length;
+        s.forEach(function (x) { vol += x.w * x.r; });
+        ((CAT[k] && CAT[k].muscles) || []).forEach(function (mm) { muscles[mm] = (muscles[mm] || 0) + s.length; });
+        var pr = prCheck(exInfo(k) || { id: k, bw: false }, s, d.date);
+        if (pr) recs.push({ date: d.date, name: exName(k), text: pr.text });
+      });
+      if (d.startedAt && d.endedAt) ms += d.endedAt - d.startedAt;
+    });
+    var days = dayNum(b.end) - dayNum(b.first) + 1;
+    r.training = { sessions: docs.length, perWeek: days > 0 ? docs.length / (days / 7) : 0, sets: sets, vol: vol, ms: ms, records: recs.length };
+    r.records = recs.reverse().slice(0, 6);
+    r.lifts = [];
+    loggedIds().forEach(function (id) {
+      var pts = seriesFor(id).filter(function (p) { return inM(p.date) && p.e1 > 0; });
+      if (pts.length < 2) return;
+      var a = pts[0], z = pts[pts.length - 1];
+      r.lifts.push({ name: exName(id), e: (z.e1 / a.e1 - 1) * 100, rel: a.rel && z.rel ? (z.rel / a.rel - 1) * 100 : null, e1: z.e1, n: pts.length });
+    });
+    r.lifts.sort(function (x, y) { return y.e - x.e; });
+    r.lifts = r.lifts.slice(0, 4);
+    r.muscles = MUSCLES.filter(function (x) { return muscles[x[0]]; }).map(function (x) { return [x[1], muscles[x[0]]]; })
+      .sort(function (x, y) { return y[1] - x[1]; });
+    var ws = bodyDocs().filter(function (d) { return d.weight != null && inM(d.date); });
+    var fs = bodyDocs().filter(function (d) { return d.fat != null && inM(d.date); });
+    r.body = ws.length ? { w0: ws[0].weight, w1: ws[ws.length - 1].weight, n: ws.length, f0: fs.length ? fs[0].fat : null, f1: fs.length ? fs[fs.length - 1].fat : null } : null;
+    var dd = dietDocs().filter(function (d) { return inM(d.date); });
+    if (dd.length) {
+      var pt = proteinTarget((r.body && r.body.w1) || latestWeight(), dietSettings()), withP = dd.filter(function (d) { return d.p != null; });
+      var eb = energyBalance(b.end);
+      r.diet = { days: dd.length, kcal: Math.round(mean(dd.map(function (d) { return d.kcal; }))), p: withP.length ? Math.round(mean(withP.map(function (d) { return d.p; }))) : null,
+        pOk: pt ? withP.filter(function (d) { return d.p >= pt * 0.95; }).length : null, pDays: withP.length, pt: pt, tdee: eb.ok ? eb.tdee : null };
+    }
+    return r;
+  }
+  /* the report as sections of tiles and lines, shared by the page and the image */
+  function reportSections(r) {
+    var t = r.training, out = [];
+    out.push({ title: 'Training', tiles: [
+      ['Sessions', String(t.sessions), t.sessions ? fmt(t.perWeek) + ' a week' : ''],
+      ['Sets', big(t.sets), ''], ['Volume', t.vol ? big(t.vol) : '–', t.vol ? 'kg' : ''],
+      ['Time trained', t.ms ? durText(t.ms) : '–', ''], ['Records', String(t.records), '']] });
+    if (r.records.length) out.push({ title: 'Records', lines: r.records.map(function (x) { return fmtShort(x.date) + ' · ' + x.name + ': ' + x.text; }) });
+    if (r.lifts.length) out.push({ title: 'Lifts this month', lines: r.lifts.map(function (x) {
+      return x.name + ': ' + pct(x.e) + ' est. 1RM' + (x.rel != null ? ', ' + pct(x.rel) + ' per kg' : '') + ' (' + x.n + ' sessions)';
+    }) });
+    if (r.body) {
+      var dw = r.body.w1 - r.body.w0;
+      out.push({ title: 'Body', tiles: [['Weight', fmt(r.body.w1), 'kg'], ['Change', signed(dw), 'kg'], ['Body fat', r.body.f1 != null ? fmt(r.body.f1) : '–', r.body.f1 != null ? '%' : ''],
+        ['Fat change', r.body.f0 != null && r.body.f1 != null ? signed(r.body.f1 - r.body.f0) : '–', r.body.f0 != null && r.body.f1 != null ? 'pts' : '']] });
+    }
+    if (r.diet) {
+      var d = r.diet;
+      out.push({ title: 'Diet', tiles: [['Days logged', String(d.days), ''], ['Calories a day', big(d.kcal), 'kcal'], ['Protein a day', d.p != null ? String(d.p) : '–', d.p != null ? 'g' : ''],
+        ['Protein target', d.pOk != null && d.pDays ? d.pOk + '/' + d.pDays : '–', d.pOk != null && d.pDays ? 'days' : ''],
+        ['Maintenance', d.tdee ? big(d.tdee) : '–', d.tdee ? 'kcal' : '']] });
+    }
+    if (r.muscles.length) out.push({ title: 'Sets per muscle', lines: [r.muscles.map(function (x) { return x[0] + ' ' + x[1]; }).join(' · ')] });
+    // leave out what was not measured this month
+    out.forEach(function (sec) { if (sec.tiles) sec.tiles = sec.tiles.filter(function (t) { return t[1] !== '–'; }); });
+    return out.filter(function (sec) { return (sec.tiles && sec.tiles.length) || (sec.lines && sec.lines.length); });
+  }
+  function renderReport(top) {
+    var v = $('#view'), m = top.month || todayISO().slice(0, 7), r = monthReport(m), cur = todayISO().slice(0, 7);
+    $('#ptitle').textContent = 'Monthly report';
+    $('#psub').textContent = r.label;
+    v.className = 'view';
+    var secs = reportSections(r), empty = !r.training.sessions && !r.body && !r.diet;
+    v.replaceChildren.apply(v, [
+      subnav(empty ? null : h('button', { type: 'button', class: 'btn small primary', text: 'Share', onclick: function () { shareReport(r); } })),
+      h('div', { class: 'wnav' },
+        h('button', { type: 'button', class: 'btn small', 'aria-label': 'Previous month', text: '‹', onclick: function () { top.month = addMonths(m, -1); renderReport(top); } }),
+        h('h2', { text: r.label }),
+        h('button', { type: 'button', class: 'btn small', 'aria-label': 'Next month', text: '›', disabled: m >= cur, onclick: function () { top.month = addMonths(m, 1); renderReport(top); } })),
+      empty ? h('section', { class: 'panel empty' }, h('h2', { text: 'Nothing logged in ' + r.label }), h('p', { text: 'Sessions, weigh-ins and diet days from this month appear here.' })) : null,
+      ...(empty ? [] : secs.map(function (s) {
+        return h('section', { class: 'panel' }, h('h2', { text: s.title }),
+          s.tiles ? h('div', { class: 'tiles' }, s.tiles.map(function (x) { return tile(x[0], x[1], /^[a-z%]+$|^kg$|^pts$/.test(x[2]) ? x[2] : '', /^[a-z%]+$|^kg$|^pts$/.test(x[2]) ? null : x[2] || null); })) : null,
+          s.lines ? h('div', { class: 'rows' }, s.lines.map(function (l) { return h('div', { class: 'row r1' }, h('span', { text: l })); })) : null);
+      })),
+      h('p', { class: 'msg', id: 'rmsg', 'aria-live': 'polite' })].filter(Boolean));
+  }
+  /* draw the report on a canvas (1080 px wide) in the app's colours */
+  function reportImage(r) {
+    var W = 1080, P = 56, secs = reportSections(r), cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+    var F = function (wt, px) { return wt + ' ' + px + 'px Poppins, system-ui, sans-serif'; };
+    function wrap(text, maxW, font) {
+      ctx.font = font;
+      var words = String(text).split(' '), lines = [], cur = '';
+      words.forEach(function (w) { var t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
+      if (cur) lines.push(cur);
+      return lines;
+    }
+    // layout pass: work out the height first
+    var cols = 3, gap = 16, tw = (W - 2 * P - 2 * 28 - gap * (cols - 1)) / cols, th = 128, y = 290, blocks = [];
+    secs.forEach(function (s) {
+      var hgt = 28 + 46, lines = [];
+      if (s.tiles) hgt += Math.ceil(s.tiles.length / cols) * (th + gap);
+      if (s.lines) s.lines.forEach(function (l) { lines = lines.concat(wrap(l, W - 2 * P - 84, F(400, 30)).map(function (t, i) { return { t: t, first: i === 0 }; })); });
+      hgt += lines.length * 44 + (lines.length ? 8 : 0) + 12;
+      blocks.push({ s: s, y: y, h: hgt, lines: lines });
+      y += hgt + 24;
+    });
+    var H = y + 70;
+    cv.width = W; cv.height = H;
+    ctx.fillStyle = '#0c0f1d'; ctx.fillRect(0, 0, W, H);
+    var g = ctx.createRadialGradient(W * 0.85, -60, 10, W * 0.85, -60, 700);
+    g.addColorStop(0, 'rgba(123,108,246,.35)'); g.addColorStop(1, 'rgba(123,108,246,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 700);
+    function rr(x, yy, w, hh, rad, fill) { ctx.beginPath(); ctx.moveTo(x + rad, yy); ctx.arcTo(x + w, yy, x + w, yy + hh, rad); ctx.arcTo(x + w, yy + hh, x, yy + hh, rad); ctx.arcTo(x, yy + hh, x, yy, rad); ctx.arcTo(x, yy, x + w, yy, rad); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); }
+    var lg = ctx.createLinearGradient(P, 64, P + 64, 128); lg.addColorStop(0, '#a99cff'); lg.addColorStop(1, '#7b6cf6');
+    rr(P, 64, 64, 64, 20, lg);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    [[P + 19, 82, P + 19, 110], [P + 12, 89, P + 12, 103], [P + 45, 82, P + 45, 110], [P + 52, 89, P + 52, 103], [P + 19, 96, P + 45, 96]].forEach(function (l) { ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(l[2], l[3]); ctx.stroke(); });
+    ctx.fillStyle = '#f2f3f9'; ctx.font = F(600, 34); ctx.textBaseline = 'middle'; ctx.fillText('Lift Log', P + 84, 96);
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = F(600, 64); ctx.fillText(r.label, P, 205);
+    ctx.fillStyle = '#8b91aa'; ctx.font = F(400, 28); ctx.fillText('Monthly report', P, 240);
+    blocks.forEach(function (bk) {
+      rr(P, bk.y, W - 2 * P, bk.h, 36, '#161a2c');
+      ctx.fillStyle = '#f2f3f9'; ctx.font = F(600, 34); ctx.fillText(bk.s.title, P + 28, bk.y + 28 + 34);
+      var yy = bk.y + 28 + 46 + 12;
+      if (bk.s.tiles) {
+        bk.s.tiles.forEach(function (t, i) {
+          var cx = P + 28 + (i % cols) * (tw + gap), cy = yy + Math.floor(i / cols) * (th + gap);
+          rr(cx, cy, tw, th, 24, '#1e2338');
+          ctx.fillStyle = '#8b91aa'; ctx.font = F(400, 24); ctx.fillText(t[0], cx + 22, cy + 40);
+          ctx.fillStyle = '#f2f3f9'; ctx.font = F(600, 40); ctx.fillText(t[1], cx + 22, cy + 92);
+          if (t[2]) { var vw = ctx.measureText(t[1]).width; ctx.fillStyle = '#8b91aa'; ctx.font = F(500, 22); ctx.fillText(t[2], cx + 22 + vw + 8, cy + 92); }
+        });
+        yy += Math.ceil(bk.s.tiles.length / cols) * (th + gap);
+      }
+      ctx.font = F(400, 30);
+      bk.lines.forEach(function (l) {
+        if (l.first) { ctx.fillStyle = '#a99cff'; ctx.beginPath(); ctx.arc(P + 34, yy + 22, 5, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#dfe1ec'; ctx.fillText(l.t, P + 52, yy + 32);
+        yy += 44;
+      });
+    });
+    ctx.fillStyle = '#5d6380'; ctx.font = F(400, 22); ctx.fillText('Made with Lift Log · ' + fmtLong(todayISO()), P, H - 34);
+    return cv;
+  }
+  function shareReport(r) {
+    var msg = $('#rmsg');
+    var go = function () {
+      var cv = reportImage(r), name = 'lift-log-report-' + r.month + '.png';
+      if (NATIVE && NATIVE.shareImage) {
+        try { NATIVE.shareImage(name, cv.toDataURL('image/png').split(',')[1]); if (msg) msg.textContent = 'Choose where to send the report.'; }
+        catch (e) { if (msg) msg.textContent = 'Could not share the image.'; }
+        return;
+      }
+      cv.toBlob(function (blob) {
+        var c = window.claude;
+        if (!blob || !c || typeof c.use !== 'function') { if (msg) msg.textContent = 'Sharing is not available in this view.'; return; }
+        c.use('downloads').then(function (dl) {
+          if (!dl) { if (msg) msg.textContent = 'Sharing is not available in this view.'; return; }
+          return dl.save({ filename: name, data: blob }).then(function () { if (msg) msg.textContent = 'Report image saved.'; }, function (err) {
+            if (msg) msg.textContent = err && err.code === 'declined' ? '' : 'Could not save the image. Try again.';
+          });
+        }).catch(function () { if (msg) msg.textContent = 'Sharing is not available in this view.'; });
+      }, 'image/png');
+    };
+    if (document.fonts && document.fonts.load) Promise.all([document.fonts.load('600 40px Poppins'), document.fonts.load('400 30px Poppins')]).then(go, go);
+    else go();
+  }
+
+  /* ---------- body map: sets per muscle on a front and a back figure (original drawing, mirrored halves) ---------- */
+  var BM_BASE = '<ellipse cx="50" cy="14" rx="9" ry="11"/><rect x="45" y="22" width="10" height="10" rx="3"/>' +
+    '<path d="M29 34 Q50 27 71 34 L69 60 Q66 80 66 100 L34 100 Q34 80 31 60 Z"/><path d="M33 97 L67 97 Q70 111 66 121 L34 121 Q30 111 33 97 Z"/>';
+  var BM_BASE_HALF = '<ellipse cx="26" cy="58" rx="6.2" ry="15"/><ellipse cx="23" cy="84" rx="5" ry="13"/><ellipse cx="21.5" cy="101" rx="3.6" ry="5"/>' +
+    '<ellipse cx="41" cy="136" rx="9" ry="24"/><ellipse cx="40" cy="174" rx="5.6" ry="17"/><ellipse cx="40" cy="194" rx="5.5" ry="3.2"/>';
+  var BM_FRONT = [
+    ['shoulders', '<ellipse cx="33.5" cy="40.5" rx="6" ry="7"/>'],
+    ['sidedelt', '<ellipse cx="27.6" cy="41.5" rx="3.6" ry="7"/>'],
+    ['chest', '<path d="M37 35 Q44 32.5 49.3 35 L49.3 55 Q43 58.5 36.6 53 Q34 45 37 35 Z"/>'],
+    ['biceps', '<ellipse cx="26" cy="60" rx="4.6" ry="10.5"/>'],
+    ['abs', '<rect x="43.6" y="59" width="5.7" height="8.4" rx="2"/><rect x="43.6" y="69" width="5.7" height="8.4" rx="2"/><rect x="43.6" y="79" width="5.7" height="8.4" rx="2"/><rect x="43.6" y="89" width="5.7" height="9" rx="2"/>' +
+      '<path d="M36.6 60 Q41 62 42 66 L42 93 Q38 93 35.6 86 Q37.2 72 36.6 60 Z"/>'],
+    ['quads', '<path d="M34.5 118 Q41 112 48.5 118 Q50 136 46 152 Q41 157 36 152 Q32 136 34.5 118 Z"/>']
+  ];
+  var BM_BACK = [
+    ['back', '<path d="M50 24.5 L41.5 33 Q44.5 45 50 61 Z"/><path d="M37 47 Q44 51 49.3 64 L49.3 73 Q44 86 39 90 Q34 72 37 47 Z"/><rect x="44" y="76" width="5.3" height="21" rx="2"/>'],
+    ['reardelt', '<ellipse cx="33.5" cy="40.5" rx="6" ry="7"/>'],
+    ['sidedelt', '<ellipse cx="27.6" cy="41.5" rx="3.6" ry="7"/>'],
+    ['triceps', '<ellipse cx="26" cy="59" rx="4.8" ry="11"/>'],
+    ['glutes', '<ellipse cx="42" cy="109" rx="8" ry="9"/>'],
+    ['hams', '<path d="M35 123 Q41 119 47.5 123 Q49 140 45.5 154 Q41 158 36.5 154 Q33 140 35 123 Z"/>'],
+    ['calves', '<ellipse cx="40.5" cy="171" rx="5.3" ry="12"/>']
+  ];
+  /* colour for a muscle: this week as a share of the plan's weekly sets, or the plan's weekly sets themselves */
+  function bmColor(mode, done, tgt) {
+    if (mode === 'plan') {
+      if (!tgt) return 'var(--surface3)';
+      if (tgt < 6) return '#f5a524';
+      if (tgt < 10) return '#a99cff';
+      if (tgt <= 20) return '#4fc28f';
+      return '#6a96f2';
+    }
+    if (!tgt) return done ? '#a99cff' : 'var(--surface3)';
+    if (done >= tgt) return '#4fc28f';
+    if (!done) return 'var(--surface3)';
+    return 'color-mix(in srgb, #7b6cf6 ' + Math.round(35 + 55 * done / tgt) + '%, var(--surface3))';
+  }
+  function bodyFigure(shapes, label, mode, done, tgt) {
+    var parts = shapes.map(function (s) {
+      var m = s[0], sel = state.bmSel === m;
+      return '<g class="m' + (sel ? ' sel' : '') + '" data-m="' + m + '" style="fill:' + bmColor(mode, done[m] || 0, tgt[m] || 0) + '">' + s[1] + '</g>';
+    }).join('');
+    var svg = '<svg viewBox="12 0 76 202" role="img" aria-label="' + label + ' view of the body, coloured by sets per muscle">' +
+      '<g class="base">' + BM_BASE + BM_BASE_HALF + '<g transform="translate(100 0) scale(-1 1)">' + BM_BASE_HALF + '</g></g>' +
+      parts + '<g transform="translate(100 0) scale(-1 1)">' + parts + '</g></svg>';
+    var fig = h('figure', null);
+    fig.innerHTML = svg;
+    fig.append(h('figcaption', { text: label }));
+    return fig;
+  }
+  /* exercises from the library for a muscle that are not in the plan in use: this app's own first, then those with drawings */
+  function suggestFor(m, n) {
+    var inPlan = activeIds();
+    return LIB_IDS.filter(function (id) { var c = CAT[id]; return c.muscles[0] === m && !inPlan[id]; })
+      .sort(function (a, b) {
+        var A = CAT[a], B = CAT[b];
+        return (B.ours ? 2 : 0) + (B.img ? 1 : 0) + (B.type === 'compound' ? 0.5 : 0) - ((A.ours ? 2 : 0) + (A.img ? 1 : 0) + (A.type === 'compound' ? 0.5 : 0)) || A.name.localeCompare(B.name);
+      }).slice(0, n || 3);
+  }
+  function planSetsFor(m) {
+    var out = [];
+    DAYS.forEach(function (day) {
+      var sw = defaultSwaps(day);
+      PLAN[day].slots.forEach(function (s) {
+        var id = sw[s.id] || s.id;
+        if ((CAT[id] && CAT[id].muscles || []).indexOf(m) >= 0) out.push(PLAN[day].label + ': ' + exName(id) + ' ' + s.sets);
+      });
+    });
+    return out;
+  }
+  function musclesPanel(ws, wd, targets, deload) {
+    var mode = state.bmMode === 'plan' ? 'plan' : 'week';
+    var tgt = {};
+    Object.keys(targets).forEach(function (k) { tgt[k] = deload && mode === 'week' ? Math.ceil(targets[k] / 2) : targets[k]; });
+    var map = h('div', { class: 'bmap' }, bodyFigure(BM_FRONT, 'Front', mode, wd.muscles, tgt), bodyFigure(BM_BACK, 'Back', mode, wd.muscles, tgt));
+    map.addEventListener('click', function (ev) {
+      var g = ev.target.closest && ev.target.closest('[data-m]');
+      if (!g) return;
+      state.bmSel = state.bmSel === g.getAttribute('data-m') ? null : g.getAttribute('data-m');
+      renderProgress();
+      var el = document.getElementById('bmDetail');
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    });
+    var legend = mode === 'plan'
+      ? [['var(--surface3)', 'Not trained'], ['#f5a524', 'Under 6 sets'], ['#a99cff', '6–9'], ['#4fc28f', '10–20'], ['#6a96f2', 'Over 20']]
+      : [['var(--surface3)', 'Nothing yet'], ['color-mix(in srgb, #7b6cf6 60%, var(--surface3))', 'Part done'], ['#4fc28f', 'Target reached']];
+    var kids = [
+      h('div', { class: 'hhead' }, h('h2', { text: 'Muscles' }),
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Show' }, [['week', ws === weekStartOf(todayISO()) ? 'This week' : 'That week'], ['plan', 'Your plan']].map(function (x) {
+          return h('button', { type: 'button', 'aria-pressed': String(mode === x[0]), text: x[1], onclick: function () { state.bmMode = x[0]; renderProgress(); } });
+        }))),
+      h('p', { class: 'subnote', text: mode === 'plan' ? 'Hard sets a week per muscle in the plan you use. About 10–20 is the range most research links to muscle growth. Tap a muscle for details.'
+        : 'Sets done' + (deload ? ' (deload week: half the usual target)' : '') + ' against what your plan has per week. Tap a muscle for details.' }),
+      map,
+      h('div', { class: 'bmleg' }, legend.map(function (l) { return h('span', null, h('i', { style: 'background:' + l[0] }), l[1]); }))];
+    var m = state.bmSel;
+    if (m && MUSCLE_NAMES[m]) {
+      var planned = targets[m] || 0, done = wd.muscles[m] || 0, low = planned < 10;
+      var sugg = low ? suggestFor(m, 3) : [];
+      var ap = activePlan();
+      kids.push(h('div', { class: 'howbox', id: 'bmDetail' },
+        h('div', { class: 'hhead' }, h('h3', { class: 'bmh', text: MUSCLE_NAMES[m] }),
+          h('span', { class: 'tag ' + (planned >= 10 ? 't-good' : planned ? 't-warn' : 't-bad'), text: planned + ' sets a week in your plan' })),
+        h('p', { class: 'subnote', text: (ws === weekStartOf(todayISO()) ? 'This week: ' : 'That week: ') + done + ' of ' + (tgt[m] || 0) + ' sets done.' }),
+        planSetsFor(m).length ? h('p', { class: 'subnote', text: planSetsFor(m).join(' · ') }) : null,
+        low ? h('p', { text: planned ? 'Fewer than 10 sets a week is on the low side for growth. Adding one of these is a simple fix:' : 'Your plan does not train this muscle directly. Some options from the library:' }) : null,
+        sugg.length ? h('div', { class: 'lib' }, sugg.map(function (id) { return libRow(id, null, { pick: null }, activeIds()); })) : null,
+        low ? h('div', { class: 'acts' }, h('button', { type: 'button', class: 'btn small primary', text: ap.builtin ? 'Copy the plan to change it' : 'Edit your plan', onclick: function () {
+          if (ap.builtin) pushView({ v: 'plans' }); else pushView({ v: 'edit', id: ap.id });
+        } })) : null));
+    }
+    if (mode === 'week') {
+      kids.push(h('div', { class: 'mbars' }, MUSCLES.filter(function (x) { return tgt[x[0]] || wd.muscles[x[0]]; }).map(function (x) {
+        var t = tgt[x[0]] || 0, d = wd.muscles[x[0]] || 0;
+        return h('div', { class: 'mbar' + (t && d >= t ? ' met' : '') },
+          h('span', { text: x[1] }),
+          h('span', { class: 'track' }, h('span', { class: 'fill', style: 'display:block;width:' + (t ? Math.min(100, Math.round(d / t * 100)) : 100) + '%' })),
+          h('span', { class: 'n', text: d + '/' + t }));
+      })));
+    }
+    return h('section', { class: 'panel' }, kids);
+  }
+
   function dietRow(ws) {
     var dw = dietWeek(ws);
     if (!dw) return null;
@@ -2199,13 +2588,6 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         h('span', { class: 'ds' }, days.map(function (x) { return h('i', { class: dc(x) }); })));
     }));
     var deload = isDeloadWeek(ws);
-    var bars = h('div', { class: 'mbars' }, MUSCLES.filter(function (m) { return targets[m[0]]; }).map(function (m) {
-      var tgt = deload ? Math.ceil(targets[m[0]] / 2) : targets[m[0]], done = wd.muscles[m[0]] || 0;
-      return h('div', { class: 'mbar' + (done >= tgt ? ' met' : '') },
-        h('span', { text: m[1] }),
-        h('span', { class: 'track' }, h('span', { class: 'fill', style: 'display:block;width:' + Math.min(100, Math.round(done / tgt * 100)) + '%' })),
-        h('span', { class: 'n', text: done + '/' + tgt }));
-    }));
     var weeks = [], per = Math.max(1, DAYS.length);
     for (var i = 7; i >= 0; i--) weeks.push(addDays(ws, -7 * i));
     var adh = h('div', { class: 'adh', role: 'img', 'aria-label': 'Sessions per week, last 8 weeks' }, weeks.map(function (w) {
@@ -2229,8 +2611,6 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
           h('div', null, h('i', { style: 'background:var(--warn)' }), 'Time trained', h('b', { text: wd.ms ? fmtDur(wd.ms) : '–' })),
           h('div', null, h('i', { style: 'background:var(--good)' }), 'Volume', h('b', { text: wd.vol ? big(wd.vol) + ' kg' : '–' })))),
       dietRow(ws),
-      h('p', { class: 'sub', text: 'Sets per muscle' + (deload ? ' · deload week, half target' : '') }),
-      bars,
       h('p', { class: 'sub', text: 'Sessions per week' }),
       adh);
   }
@@ -2256,7 +2636,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     v.className = 'view ' + dc(e.day);
     var pts = seriesFor(e.id);
     var weighted = pts.some(function (p) { return p.top > 0; });
-    var avail = Object.keys(METRICS).filter(function (k) { return weighted || !METRICS[k].weighted; });
+    var avail = Object.keys(METRICS).filter(function (k) { return (weighted || !METRICS[k].weighted) && (k !== 'rel' || pts.some(function (p) { return p.rel; })); });
     if (!state.metric || avail.indexOf(state.metric) < 0) state.metric = avail[0];
     var inPlan = {};
     DAYS.forEach(function (d) { PLAN[d].slots.forEach(function (x) { inPlan[x.id] = 1; }); });
@@ -2274,7 +2654,10 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     var seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Metric' }, avail.map(function (k) {
       return h('button', { type: 'button', 'aria-pressed': String(k === state.metric), text: METRICS[k].label, onclick: function () { state.metric = k; renderProgress(); } });
     }));
-    var kids = [deloadBanner(), weekPanel(), recordsPanel(), h('h2', { class: 'sub', text: 'Lift trend' }), h('div', { class: 'picker' }, sel, seg)];
+    var repBtn = h('button', { type: 'button', class: 'planbar', onclick: function () { pushView({ v: 'report', month: todayISO().slice(0, 7) }); } },
+      h('span', { class: 'pt' }, h('span', { class: 'pk', text: 'Monthly report' }), h('span', { class: 'pv', text: monthLabel(todayISO().slice(0, 7)) + ' so far' })),
+      h('span', { class: 'go', text: 'Open' }));
+    var kids = [deloadBanner(), repBtn, weekPanel(), musclesPanel(state.week, weekData(state.week), muscleTargets(), isDeloadWeek(state.week)), recordsPanel(), strengthPanel(), h('h2', { class: 'sub', text: 'Lift trend' }), h('div', { class: 'picker' }, sel, seg)];
     if (!pts.length) {
       state.charts.chart = null;
       kids.push(h('div', { class: 'panel empty' },
@@ -2282,9 +2665,9 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         h('p', { text: 'Record a set on the Log tab and your trend shows up here.' }),
         h('button', { type: 'button', class: 'btn', text: 'Go to Log', onclick: function () { flush(); state.day = e.day; state.dayPicked = true; reloadDraft(); setTab('log'); } })));
     } else {
-      var m = METRICS[state.metric];
-      var series = pts.map(function (p) { return { date: p.date, t: p.t, v: p[m.key] }; });
-      state.charts.chart = { pts: series, label: m.label };
+      var m = METRICS[state.metric], mf = m.f || fmt;
+      var series = pts.filter(function (p) { return p[m.key] != null; }).map(function (p) { return { date: p.date, t: p.t, v: p[m.key] }; });
+      state.charts.chart = { pts: series, label: m.label, f: m.f };
       var best = Math.max.apply(null, series.map(function (p) { return p.v; }));
       var latest = series[series.length - 1].v;
       var recent = pts.slice().reverse().slice(0, 10).map(function (p) {
@@ -2293,7 +2676,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       kids.push(h('section', { class: 'panel' },
         h('h2', { text: e.name + ' · ' + m.label }),
         h('div', { class: 'chart', id: 'chart' }),
-        h('div', { class: 'tiles' }, tile('Best', fmt(best), m.unit), tile('Latest', fmt(latest), m.unit), tile('Sessions', String(pts.length), ''))));
+        h('div', { class: 'tiles' }, tile('Best', mf(best), m.unit), tile('Latest', mf(latest), m.unit), tile('Sessions', String(pts.length), '')),
+        m.key === 'rel' ? h('p', { class: 'subnote', text: 'Estimated 1RM divided by your body weight on the day (latest weigh-in before it). Rising while you cut means you are keeping your strength.' }) : null));
       kids.push(h('section', { class: 'panel' }, h('h2', { text: 'Recent sessions' }), h('div', { class: 'rows' }, recent)));
     }
     v.replaceChildren.apply(v, kids.filter(Boolean));
@@ -3692,6 +4076,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     if (top.v === 'plans') renderPlans();
     else if (top.v === 'edit') renderEditor(top);
     else if (top.v === 'lib') renderLibrary(top);
+    else if (top.v === 'report') renderReport(top);
     else renderExDetail(top);
   }
 
