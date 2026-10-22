@@ -452,6 +452,8 @@ details.sess .body { padding: 0 16px 16px; display: grid; gap: 10px; }
 .ex b { font-weight: 600; }
 
 /* body */
+.bseg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--surface); border-radius: 99px; padding: 5px; box-shadow: inset 0 0 0 1px var(--line); }
+.bseg button { min-height: 42px; font-size: 14px; box-shadow: none; background: transparent; }
 .bform { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .bform .full { grid-column: 1 / -1; }
 .lbl { display: grid; gap: 5px; font-size: 12.5px; color: var(--muted); }
@@ -928,7 +930,8 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     editPlan: null, pick: null, lib: { q: '', m: 'all', eq: 'all', open: null }, howOpen: null, confirmPlan: null, confirmDay: null,
     restT: null, autoRest: true, sound: true, confirmReset: false, swapOpen: null, swapAlways: false,
     healthMsg: '', healthSilent: false, importMsg: '', report: null, reportMsg: '', vision: null,
-    loaded: false, dataMsg: '', backup: null, dayPicked: false
+    loaded: false, dataMsg: '', backup: null, dayPicked: false,
+    bview: 'body', dform: null, dreview: null, dietMsg: '', dmetric: 'kcal', ocrMode: null, nutriSilent: false
   };
   function applySettings(v) {
     if (!v || typeof v !== 'object') return;
@@ -938,6 +941,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     if (Array.isArray(v.deloads)) s.deloads = v.deloads.filter(function (x) { return typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x); });
     if (v.plans && typeof v.plans === 'object') s.plans = JSON.parse(JSON.stringify(v.plans));
     if (typeof v.activePlan === 'string') s.activePlan = v.activePlan;
+    if (v.diet && typeof v.diet === 'object') s.diet = Object.assign({}, v.diet);
     rebuildPlans();
   }
   try {
@@ -1205,14 +1209,26 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
         h('div', { class: 'acts' }, h('button', { type: 'button', class: 'btn small', text: 'End deload week', onclick: function () { setDeload(false); } })));
     }
     var title = a.mode === 'drop' ? 'Time for an easier week?' : 'Deload due';
+    var lifts = a.mode === 'drop' ? a.drops.slice(0, 3).join(', ') + (a.drops.length > 3 ? ' and ' + (a.drops.length - 3) + ' more' : '') : '';
     var text = a.mode === 'drop'
-      ? 'Your performance dropped two sessions in a row on ' + a.drops.slice(0, 3).join(', ') + (a.drops.length > 3 ? ' and ' + (a.drops.length - 3) + ' more' : '') + '. A lighter week usually brings it back.'
+      ? 'Your performance dropped two sessions in a row on ' + lifts + '. A lighter week usually brings it back.'
       : 'You have trained ' + a.weeks + ' weeks since your last easier week. Your plan calls for one every 6–8 weeks.';
+    // with diet data: a big deficit is the more likely cause, so suggest eating at maintenance first
+    var ds = dietSettings(), dd = a.mode === 'drop' ? currentDeficit() : null, food = false;
+    if (a.mode === 'drop' && onDietBreak(ds)) {
+      text = 'Your performance dropped two sessions in a row on ' + lifts + '. You are on a diet break until ' + fmtShort(ds.breakUntil) + '; give it the week before deciding on a deload.';
+    } else if (dd && dd.deficit >= 300) {
+      food = true;
+      title = 'Eat more, or deload?';
+      text = 'Your performance dropped two sessions in a row on ' + lifts + ', while you have eaten about ' + big(dd.deficit) + ' kcal a day below your maintenance (' + big(dd.tdee) + ' kcal). ' +
+        'That deficit is the likely cause. A week at maintenance calories, a diet break, often brings strength back without cutting your training; a deload week is the other option.';
+    }
     return h('section', { class: 'banner' },
       h('h2', null, h('span', { class: 'tag t-warn', text: a.mode === 'drop' ? 'Performance' : a.weeks + ' weeks' }), title),
       h('p', { text: text }),
       h('div', { class: 'acts' },
-        h('button', { type: 'button', class: 'btn small primary', text: 'Make this week a deload', onclick: function () { setDeload(true); } }),
+        food ? h('button', { type: 'button', class: 'btn small primary', text: 'Take a diet break this week', onclick: startDietBreak }) : null,
+        h('button', { type: 'button', class: 'btn small' + (food ? '' : ' primary'), text: 'Make this week a deload', onclick: function () { setDeload(true); } }),
         h('button', { type: 'button', class: 'btn small', text: 'Not now', onclick: dismissDeload })));
   }
 
@@ -1239,13 +1255,13 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     return null;
   }
   function backupCounts(o) {
-    var n = { sessions: 0, body: 0 };
+    var n = { sessions: 0, body: 0, diet: 0 };
     if (!o || typeof o !== 'object') return n;
     Object.keys(o.logs || {}).forEach(function (k) { if (okSession(o.logs[k])) n.sessions++; });
-    Object.keys(o.body || {}).forEach(function (k) { var d = o.body[k]; if (d && d.date) n.body++; });
+    Object.keys(o.body || {}).forEach(function (k) { var d = o.body[k]; if (d && d.date) { if (d.type === 'diet') n.diet = (n.diet || 0) + 1; else n.body++; } });
     return n;
   }
-  function hasData(o) { var n = backupCounts(o); return n.sessions + n.body > 0; }
+  function hasData(o) { var n = backupCounts(o); return n.sessions + n.body + n.diet > 0; }
   function applySnapshot(o) {
     var logs = {}, body = {};
     if (o.settings) applySettings(o.settings);
@@ -1315,9 +1331,9 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     Object.keys((o && o.body) || {}).forEach(function (k) {
       var d = o.body[k];
       if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) return;
-      var id = 'b_' + d.date, cur = state.body[id];
+      var diet = d.type === 'diet', id = (diet ? 'n_' : 'b_') + d.date, cur = state.body[id];
       if (cur && (cur.updated || 0) >= (d.updated || 0)) return;
-      bod.push(Object.assign({}, d, { id: id, type: 'body' }));
+      bod.push(Object.assign({}, d, { id: id, type: diet ? 'diet' : 'body' }));
     });
     if (s.rest && typeof s.rest === 'object') Object.keys(s.rest).forEach(function (k) {
       if (state.settings.rest[k] == null && typeof s.rest[k] === 'number' && EXMAP[k]) { state.settings.rest[k] = s.rest[k]; changed = true; }
@@ -1327,6 +1343,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       Object.keys(PLAN).forEach(function (d) { sl = sl || slotById(d, k); });
       if (!state.settings.swaps[k] && sl && sl.alts.indexOf(s.swaps[k]) >= 0) { state.settings.swaps[k] = s.swaps[k]; changed = true; }
     });
+    if (s.diet && typeof s.diet === 'object' && !state.settings.diet) { state.settings.diet = Object.assign({}, s.diet); changed = true; }
     if (Array.isArray(s.deloads)) s.deloads.forEach(function (w) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(w) && state.settings.deloads.indexOf(w) < 0) { state.settings.deloads.push(w); changed = true; }
     });
@@ -1430,7 +1447,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     snap.docs.forEach(function (d) {
       var v = d.data();
       if (d.id === 'settings') return;
-      if (d.id.indexOf('b_') === 0) { if (v && v.date) b[d.id] = v; return; }
+      if (d.id.indexOf('b_') === 0 || d.id.indexOf('n_') === 0) { if (v && v.date) b[d.id] = v; return; }
       if (okSession(v)) m[d.id] = v;
     });
     state.logs = m;
@@ -1494,7 +1511,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     setSaveT = setTimeout(function () {
       var s = state.settings;
       var data = { rest: Object.assign({}, s.rest), swaps: Object.assign({}, s.swaps), deloads: s.deloads.slice(),
-        plans: JSON.parse(JSON.stringify(s.plans || {})), activePlan: s.activePlan || BUILTIN_ID, updated: Date.now() };
+        plans: JSON.parse(JSON.stringify(s.plans || {})), activePlan: s.activePlan || BUILTIN_ID, diet: Object.assign({}, s.diet || {}), updated: Date.now() };
       var p = state.kind === 'cloud' ? saving.then(function () { return col.doc('settings').set(data); }) : Promise.resolve();
       p.then(function () { setSaveT = null; }, function () { setSaveT = null; setStatus('error'); });
     }, 700);
@@ -2161,6 +2178,16 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     });
     return out;
   }
+  function dietRow(ws) {
+    var dw = dietWeek(ws);
+    if (!dw) return null;
+    return h('div', { class: 'opts' },
+      h('p', { class: 'sub', text: 'Diet · ' + dw.days + (dw.days === 1 ? ' day logged' : ' days logged') }),
+      h('div', { class: 'tiles' },
+        tile('Calories a day', big(dw.kcal), 'kcal'),
+        tile('Protein a day', dw.p != null ? String(dw.p) : '–', dw.p != null ? 'g' : ''),
+        tile('Protein target', dw.pOk != null && dw.pDays ? dw.pOk + '/' + dw.pDays : '–', dw.pOk != null && dw.pDays ? 'days' : '')));
+  }
   function weekPanel() {
     var ws = state.week, cur = weekStartOf(todayISO()), wd = weekData(ws), today = todayISO();
     var targets = muscleTargets();
@@ -2201,6 +2228,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
           h('div', null, h('i', { style: 'background:var(--accent)' }), 'Sets done', h('b', { text: String(wd.sets) })),
           h('div', null, h('i', { style: 'background:var(--warn)' }), 'Time trained', h('b', { text: wd.ms ? fmtDur(wd.ms) : '–' })),
           h('div', null, h('i', { style: 'background:var(--good)' }), 'Volume', h('b', { text: wd.vol ? big(wd.vol) + ' kg' : '–' })))),
+      dietRow(ws),
       h('p', { class: 'sub', text: 'Sets per muscle' + (deload ? ' · deload week, half target' : '') }),
       bars,
       h('p', { class: 'sub', text: 'Sessions per week' }),
@@ -2486,6 +2514,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   window.liftlogOcr = function (str) {
     var res;
     try { res = typeof str === 'string' ? JSON.parse(str) : str; } catch (e) { return; }
+    if (state.ocrMode === 'diet') { state.ocrMode = null; dietOcrResult(res); return; }
     if (!res || res.status !== 'ok') {
       state.reportMsg = res && res.status === 'cancelled' ? '' : 'Could not read that image' + (res && res.message ? ': ' + res.message : '.');
       if (state.tab === 'body') renderBody();
@@ -2613,7 +2642,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       : x.label.toLowerCase() + ' ' + fmt(v) + (x.unit && !x.comp ? '' : x.unit === '%' ? '%' : x.unit ? ' ' + x.unit : '');
   }
   function bodyDocs() {
-    return Object.keys(state.body).map(function (k) { return state.body[k]; }).filter(function (b) { return b && b.date; })
+    return Object.keys(state.body).map(function (k) { return state.body[k]; }).filter(function (b) { return b && b.date && b.type !== 'diet'; })
       .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   }
   function mergeBody(rows, src) {
@@ -2711,6 +2740,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
       if (NATIVE.healthAvailable() !== 'available') return;
       state.healthSilent = true;
       NATIVE.healthImport(60, false);
+      if (NATIVE.healthImportNutrition) setTimeout(function () { nutritionImport(false); }, 1500);
     } catch (e) { /* ignore */ }
   }
   function healthImport() {
@@ -2783,8 +2813,9 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   function renderBody() {
     if (topView()) return;
     var v = $('#view');
+    if (state.bview === 'diet') { renderDiet(v); return; }
     v.className = 'view tn1';
-    var docs = bodyDocs(), kids = [];
+    var docs = bodyDocs(), kids = [bodySeg()];
     if (!state.bform) state.bform = { date: todayISO() };
     var withW = docs.filter(function (d) { return d.weight != null; });
     if (withW.length) {
@@ -2904,6 +2935,492 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     drawChart('bchart');
   }
 
+  /* ---------- diet: daily totals (typed in, read from a Macros screenshot, or from Health Connect),
+     read together with the scale weight and the training log ---------- */
+  var DF = [
+    { k: 'kcal', label: 'Calories', unit: 'kcal', min: 0, max: 15000, int: true },
+    { k: 'p', label: 'Protein', unit: 'g', min: 0, max: 1000 },
+    { k: 'c', label: 'Carbs', unit: 'g', min: 0, max: 2500 },
+    { k: 'f', label: 'Fat', unit: 'g', min: 0, max: 1000 }
+  ];
+  var DIET_SRC = { manual: 'Entered here', macros: 'Macros screenshot', health: 'Health Connect' };
+  var KCAL_PER_KG = 7700;   // energy in a kilo of body weight change, roughly
+  function dietSettings() {
+    var d = state.settings.diet || {};
+    return { goal: d.goal === 'cut' || d.goal === 'bulk' ? d.goal : 'maintain', rate: d.rate > 0 ? d.rate : null,
+      protein: d.protein > 0 ? d.protein : 1.8, breakUntil: typeof d.breakUntil === 'string' ? d.breakUntil : null };
+  }
+  function setDiet(patch) {
+    state.settings.diet = Object.assign({}, state.settings.diet || {}, patch);
+    saveSettings();
+  }
+  /* % of body weight per week, negative when cutting */
+  function goalRate(ds) {
+    if (ds.goal === 'cut') return -(ds.rate || 0.5);
+    if (ds.goal === 'bulk') return ds.rate || 0.25;
+    return 0;
+  }
+  function onDietBreak(ds) { return !!(ds.breakUntil && todayISO() <= ds.breakUntil); }
+  function dietDocs() {
+    return Object.keys(state.body).map(function (k) { return state.body[k]; })
+      .filter(function (d) { return d && d.type === 'diet' && d.date && d.kcal > 0; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  }
+  function dietOn(date) { var d = state.body['n_' + date]; return d && d.type === 'diet' ? d : null; }
+  function dayNum(s) { return Math.round(parseISO(s).getTime() / 864e5); }
+  function weighIns(from, to) {
+    return bodyDocs().filter(function (d) { return d.weight != null && d.date >= from && d.date <= to; });
+  }
+  function latestWeight() { var w = bodyDocs().filter(function (d) { return d.weight != null; }).pop(); return w ? w.weight : null; }
+  function mean(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
+  function slopeOf(pts) {
+    var n = pts.length, mx = mean(pts.map(function (p) { return p.x; })), my = mean(pts.map(function (p) { return p.y; })), sxy = 0, sxx = 0;
+    pts.forEach(function (p) { sxy += (p.x - mx) * (p.y - my); sxx += (p.x - mx) * (p.x - mx); });
+    return n > 1 && sxx > 0 ? sxy / sxx : 0;
+  }
+  /* maintenance calories over the last 4 weeks: what you ate on average, minus what the weight trend
+     says you stored (or plus what you lost), at ~7,700 kcal per kg */
+  function energyBalance(end) {
+    end = end || todayISO();
+    var start = addDays(end, -27);
+    var days = dietDocs().filter(function (d) { return d.date >= start && d.date <= end; });
+    var ws = weighIns(start, end);
+    var r = { start: start, end: end, days: days.length, weighIns: ws.length, span: ws.length > 1 ? dayNum(ws[ws.length - 1].date) - dayNum(ws[0].date) : 0 };
+    r.avg = days.length ? mean(days.map(function (d) { return d.kcal; })) : null;
+    if (ws.length >= 2 && r.span >= 7) {
+      r.slope = slopeOf(ws.map(function (d) { return { x: dayNum(d.date), y: d.weight }; }));
+      r.weekly = r.slope * 7;
+    }
+    r.ok = r.days >= 10 && r.weighIns >= 4 && r.span >= 10;
+    if (r.ok) r.tdee = Math.round((r.avg - r.slope * KCAL_PER_KG) / 10) * 10;
+    return r;
+  }
+  function dietTarget(eb, ds, w) {
+    if (!eb.ok || !w) return null;
+    var brk = onDietBreak(ds), rate = brk ? 0 : goalRate(ds), kgWeek = w * rate / 100;
+    return { kcal: Math.round((eb.tdee + kgWeek * KCAL_PER_KG / 7) / 50) * 50, kgWeek: kgWeek, rate: rate, onBreak: brk };
+  }
+  function proteinTarget(w, ds) { return w ? Math.round(w * ds.protein) : null; }
+  function recentIntake(n) {
+    var from = addDays(todayISO(), -(n - 1)), d = dietDocs().filter(function (x) { return x.date >= from; });
+    return { days: d.length, kcal: d.length ? mean(d.map(function (x) { return x.kcal; })) : null,
+      p: d.filter(function (x) { return x.p != null; }).length ? mean(d.filter(function (x) { return x.p != null; }).map(function (x) { return x.p; })) : null };
+  }
+  /* average daily deficit over the last 2 weeks against your maintenance, when both are known */
+  function currentDeficit() {
+    var eb = energyBalance(), ri = recentIntake(14);
+    if (!eb.ok || ri.days < 7) return null;
+    return { tdee: eb.tdee, avg: Math.round(ri.kcal), deficit: Math.round((eb.tdee - ri.kcal) / 10) * 10 };
+  }
+  function trainingDates() {
+    var o = {};
+    sessionDocs().forEach(function (d) { if (docKeys(d).length) o[d.date] = (o[d.date] || 0) + 1; });
+    return o;
+  }
+  function startDietBreak() {
+    setDiet({ breakUntil: addDays(todayISO(), 6) });
+    render();
+  }
+
+  /* week numbers for the Progress tab */
+  function dietWeek(ws) {
+    var we = addDays(ws, 6), w = latestWeight(), ds = dietSettings(), pt = proteinTarget(w, ds);
+    var d = dietDocs().filter(function (x) { return x.date >= ws && x.date <= we; });
+    if (!d.length) return null;
+    var withP = d.filter(function (x) { return x.p != null; });
+    return { days: d.length, kcal: Math.round(mean(d.map(function (x) { return x.kcal; }))),
+      p: withP.length ? Math.round(mean(withP.map(function (x) { return x.p; }))) : null,
+      pOk: pt ? withP.filter(function (x) { return x.p >= pt * 0.95; }).length : null, pDays: withP.length };
+  }
+
+  /* reading a Macros screenshot: the phone app reads the text on the device, the web page asks Claude */
+  var DIET_LABELS = {
+    kcal: [['eaten'], ['consumed'], ['calories'], ['kcal'], ['energy'], ['food']],
+    p: [['protein'], ['proteins'], ['proteine'], ['proteínas']],
+    c: [['carbs'], ['carbohydrates'], ['carbohydrate'], ['carb'], ['carboidrati']],
+    f: [['fat'], ['fats'], ['grassi'], ['lipids']]
+  };
+  function nearestNumber(rows, lab, f) {
+    var best = null, bestScore = Infinity;
+    rows.forEach(function (ws) {
+      ws.forEach(function (w) {
+        if (!/\d/.test(w.t) || /%/.test(w.t)) return;
+        var v = numIn(w.t.replace(/[.,](?=\d{3}\b)/g, ''));
+        if (!inRange(f, v)) return;
+        var cy = w.y + w.h / 2, ly = lab.y + lab.h / 2, dy = cy - ly, dx = w.x - lab.right;
+        var same = Math.abs(dy) < Math.max(w.h, lab.h) * 0.7;
+        // same line to the right, or stacked right above / below the label
+        var score = same && dx > -4 ? dx * 0.5 : Math.abs(dy) + Math.abs(w.x + w.w / 2 - (lab.x + lab.right) / 2) * 0.8 + 20;
+        if (!same && Math.abs(dy) > Math.max(lab.h, w.h) * 3.2 + 10) return;
+        if (score < bestScore) { bestScore = score; best = v; }
+      });
+    });
+    return best;
+  }
+  function parseMacros(ocr) {
+    var rows = reportWords(ocr), v = {};
+    DF.forEach(function (f) {
+      var lab = null;
+      DIET_LABELS[f.k].some(function (pat) { lab = findLabel(rows, { pats: [pat] }); return !!lab; });
+      if (!lab) return;
+      var val = nearestNumber(rows, lab, f);
+      if (val != null) v[f.k] = f.int ? Math.round(val) : rnd(val);
+    });
+    if (v.kcal == null) {
+      // a lone "1,850 kcal" without a label
+      rows.some(function (ws) { return ws.some(function (w, i) {
+        var nx = ws[i + 1], t = w.t + (nx ? ' ' + nx.t : '');
+        var m = /(\d[\d.,]{2,})\s*kcal/i.exec(t);
+        if (m) { var n = num(m[1].replace(/[.,](?=\d{3}\b)/g, '')); if (n >= 100 && n <= 15000) { v.kcal = Math.round(n); return true; } }
+        return false;
+      }); });
+    }
+    v.date = reportDate(rows);
+    return v;
+  }
+  function openDietReview(v, how) {
+    var r = { date: v.date && v.date <= todayISO() ? v.date : todayISO(), how: how, dateFound: !!v.date };
+    DF.forEach(function (f) { r[f.k] = v[f.k] != null ? String(v[f.k]) : ''; });
+    state.dreview = r;
+    state.dietMsg = '';
+    renderBody();
+    var el = document.getElementById('dietReview');
+    if (el) el.scrollIntoView({ block: 'start' });
+  }
+  function dietOcrResult(res) {
+    if (!res || res.status !== 'ok') {
+      state.dietMsg = res && res.status === 'cancelled' ? '' : 'Could not read that image' + (res && res.message ? ': ' + res.message : '.');
+      renderBody();
+      return;
+    }
+    var v = parseMacros(res);
+    if (DF.filter(function (f) { return v[f.k] != null; }).length < 2) {
+      state.dietMsg = 'No calories or macros were found in that image. Use a screenshot of the day\'s summary in Macros.';
+      renderBody();
+      return;
+    }
+    openDietReview(v, 'device');
+  }
+  function pickDietImage() {
+    if (!NATIVE || !NATIVE.ocrPickImage) return;
+    state.ocrMode = 'diet';
+    state.dietMsg = 'Reading the screenshot…';
+    renderBody();
+    try { NATIVE.ocrPickImage(); } catch (e) { state.ocrMode = null; state.dietMsg = 'Could not open the image picker.'; renderBody(); }
+  }
+  var DIET_PROMPT = 'This image is a screenshot from a calorie counting app (usually "Macros") showing one day of food. ' +
+    'Reply with only a JSON object with these keys, plain numbers without units, or null when not shown: ' +
+    '"date" (the day shown, YYYY-MM-DD, null if it says today or no date is visible), "kcal" (calories eaten that day, not the goal and not the calories left), ' +
+    '"p" (protein eaten, grams), "c" (carbohydrates eaten, grams), "f" (fat eaten, grams). ' +
+    'When a value is shown as eaten / goal, use the eaten number. Example: {"date":null,"kcal":2140,"p":152,"c":231,"f":68}';
+  function readDietWithClaude(file) {
+    if (!state.vision || !file) return;
+    state.dietMsg = 'Claude is reading the screenshot. This can take up to a minute.';
+    renderBody();
+    state.vision.json(DIET_PROMPT, { images: [file] }).then(function (o) {
+      var v = {};
+      if (o && typeof o === 'object') {
+        DF.forEach(function (f) { var n = typeof o[f.k] === 'number' ? o[f.k] : num(o[f.k]); if (inRange(f, n)) v[f.k] = f.int ? Math.round(n) : rnd(n); });
+        if (typeof o.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.date)) v.date = o.date;
+      }
+      if (DF.filter(function (f) { return v[f.k] != null; }).length < 2) { state.dietMsg = 'No calories or macros were found in that image.'; renderBody(); return; }
+      openDietReview(v, 'claude');
+    }, function (e) {
+      var c = e && e.code;
+      state.dietMsg = c === 'not_granted' || c === 'sampling_disabled' ? 'Reading images needs your permission for this page to use Claude.'
+        : c === 'image_rejected' ? 'That file could not be read. Pick a PNG or JPEG image.'
+        : c === 'rate_limited' ? 'Too many requests right now. Try again in a little while.'
+        : c === 'cancelled' ? '' : 'Could not read the screenshot. Try again.';
+      renderBody();
+    });
+  }
+
+  /* Health Connect nutrition (apps such as Macros Premium, MyFitnessPal or Samsung Health write it there) */
+  function nutritionImport(prompt) {
+    if (!NATIVE || !NATIVE.healthImportNutrition) return;
+    state.nutriSilent = !prompt;
+    if (prompt) { state.dietMsg = 'Reading Health Connect…'; renderBody(); }
+    try { NATIVE.healthImportNutrition(prompt ? 120 : 30, !!prompt); } catch (e) { if (prompt) { state.dietMsg = 'Could not start the import.'; renderBody(); } }
+  }
+  window.liftlogNutrition = function (str) {
+    var res, silent = state.nutriSilent;
+    state.nutriSilent = false;
+    try { res = typeof str === 'string' ? JSON.parse(str) : str; } catch (e) { return; }
+    function done(msg) { if (silent && !msg) return; state.dietMsg = msg; if (state.tab === 'body' && state.bview === 'diet') renderBody(); }
+    if (!res || res.status !== 'ok') {
+      if (silent) return;
+      var st = res && res.status;
+      done(st === 'no_permission' ? 'Lift Log needs permission to read nutrition. Tap Import again and allow it.'
+        : st === 'update_required' ? 'Install or update Health Connect from the Play Store, then try again.'
+        : st === 'unavailable' ? 'Health Connect is not available on this phone.'
+        : 'Could not read Health Connect' + (res && res.message ? ': ' + res.message : '.'));
+      return;
+    }
+    // per day and app: add up the meals; if two apps wrote the same day, keep the one with more calories
+    var per = {};
+    (res.items || []).forEach(function (r) {
+      if (!(r && r.t > 0)) return;
+      // the meal's own calendar day: its time shifted by the offset it was logged with
+      var at = new Date(r.t + (r.z != null ? r.z * 1000 : -new Date(r.t).getTimezoneOffset() * 60000));
+      var d = at.getUTCFullYear() + '-' + pad(at.getUTCMonth() + 1) + '-' + pad(at.getUTCDate());
+      var k = d + '|' + (r.src || ''), o = per[k] || (per[k] = { date: d, kcal: 0, p: 0, c: 0, f: 0 });
+      o.kcal += r.kcal || 0; o.p += r.p || 0; o.c += r.c || 0; o.f += r.f || 0;
+    });
+    var best = {};
+    Object.keys(per).forEach(function (k) { var o = per[k]; if (o.kcal > 0 && (!best[o.date] || o.kcal > best[o.date].kcal)) best[o.date] = o; });
+    var docs = [];
+    Object.keys(best).forEach(function (d) {
+      var o = best[d], ex = dietOn(d);
+      if (ex && ex.src !== 'health') return;   // what you typed or read from a screenshot wins
+      var nd = { id: 'n_' + d, type: 'diet', date: d, kcal: Math.round(o.kcal), p: rnd(o.p), c: rnd(o.c), f: rnd(o.f), src: 'health' };
+      if (ex && ex.kcal === nd.kcal && ex.p === nd.p && ex.c === nd.c && ex.f === nd.f) return;
+      nd.updated = Date.now();
+      docs.push(nd);
+    });
+    var n = Object.keys(best).length;
+    saveBodyDocs(docs).then(function () {
+      if (docs.length) done('Imported ' + docs.length + (docs.length === 1 ? ' day' : ' days') + ' of nutrition from Health Connect.');
+      else done(silent ? '' : n ? 'Already up to date with Health Connect.' : 'Health Connect has no nutrition entries yet. In Macros, nutrition sync needs Macros Premium.');
+    });
+  };
+
+  function saveDietDay(r, src) {
+    var date = r.date, bad = null, nd = { id: 'n_' + date, type: 'diet', date: date }, any = 0;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return 'Pick the date.';
+    DF.forEach(function (f) {
+      var raw = r[f.k];
+      if (raw == null || String(raw).trim() === '') return;
+      var v = num(String(raw).replace(/[.,](?=\d{3}\b)/g, ''));
+      if (!inRange(f, v)) { bad = f.label; return; }
+      nd[f.k] = f.int ? Math.round(v) : rnd(v);
+      any++;
+    });
+    if (bad) return bad + ' looks wrong. Check the number.';
+    if (!(nd.kcal > 0)) return 'Enter the calories for the day.';
+    nd.src = src;
+    nd.updated = Date.now();
+    saveBodyDocs([nd]).then(function () { renderBody(); });
+    return null;
+  }
+  function dietCsvText() {
+    var rows = [['date', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'source']];
+    dietDocs().forEach(function (d) { rows.push([d.date, d.kcal, d.p == null ? '' : d.p, d.c == null ? '' : d.c, d.f == null ? '' : d.f, d.src || '']); });
+    return rows.map(function (r) { return r.join(','); }).join('\n');
+  }
+
+  /* ---------- diet view (Body tab > Diet) ---------- */
+  function bar(label, done, target, unit) {
+    var pct = target ? Math.min(100, Math.round(done / target * 100)) : 0;
+    return h('div', { class: 'mbar' + (target && done >= target * 0.95 ? ' met' : '') },
+      h('span', { text: label }),
+      h('span', { class: 'track' }, h('span', { class: 'fill', style: 'display:block;width:' + pct + '%' })),
+      h('span', { class: 'n', text: big(done) + (target ? ' / ' + big(target) : '') + ' ' + unit }));
+  }
+  function dietTodayPanel(td, tgt, pt) {
+    var kids = [h('div', { class: 'hhead' }, h('h2', { text: 'Today' }), h('span', { class: 'subnote', text: fmtLong(todayISO()) }))];
+    if (td) {
+      kids.push(h('div', { class: 'mbars' },
+        bar('Calories', td.kcal, tgt ? tgt.kcal : null, 'kcal'),
+        td.p != null ? bar('Protein', td.p, pt, 'g') : null));
+      kids.push(h('div', { class: 'tiles' }, tile('Protein', td.p != null ? fmt(td.p) : '–', 'g'), tile('Carbs', td.c != null ? fmt(td.c) : '–', 'g'), tile('Fat', td.f != null ? fmt(td.f) : '–', 'g')));
+      if (tgt) {
+        var left = tgt.kcal - td.kcal;
+        kids.push(h('p', { class: 'subnote', text: left > 0 ? big(left) + ' kcal left for your ' + (tgt.onBreak ? 'diet break' : 'goal') + ' today.' : big(-left) + ' kcal over today\'s target.' }));
+      }
+    } else {
+      kids.push(h('p', { class: 'muted', text: 'Nothing logged for today yet. Read a screenshot of today in Macros, or type the totals below.' }));
+      if (tgt || pt) kids.push(h('div', { class: 'tiles' }, tgt ? tile('Calorie target', big(tgt.kcal), 'kcal') : null, pt ? tile('Protein target', String(pt), 'g') : null));
+    }
+    return h('section', { class: 'panel' }, kids);
+  }
+  function rateLabel(rate, w) {
+    var kg = w ? Math.abs(w * rate / 100) : null;
+    return Math.abs(rate) + '%' + (kg ? ' · ' + fmt(Math.round(kg * 20) / 20) + ' kg' : '');
+  }
+  function dietGoalPanel(eb, ds, w, tgt) {
+    var kids = [h('h2', { text: 'Maintenance and goal' })];
+    if (eb.ok) {
+      kids.push(h('div', { class: 'tiles' },
+        tile('Maintenance', big(eb.tdee), 'kcal'),
+        tile('You eat', big(Math.round(eb.avg)), 'kcal'),
+        tile('Weight trend', signed(eb.weekly), 'kg/wk')));
+      kids.push(h('p', { class: 'subnote', text: 'Worked out from ' + eb.days + ' days of food and ' + eb.weighIns + ' weigh-ins over the last 4 weeks: what you eat, adjusted by how your weight moved. It updates as you log.' }));
+    } else {
+      var need = [];
+      if (eb.days < 10) need.push((10 - eb.days) + ' more ' + (10 - eb.days === 1 ? 'day' : 'days') + ' of food logging');
+      if (eb.weighIns < 4) need.push((4 - eb.weighIns) + ' more ' + (4 - eb.weighIns === 1 ? 'weigh-in' : 'weigh-ins'));
+      else if (eb.span < 10) need.push('weigh-ins spread over at least 10 days');
+      kids.push(h('p', { class: 'muted', text: 'Your maintenance calories appear here once there is enough data in the last 4 weeks: ' + need.join(' and ') + '. So far: ' +
+        eb.days + (eb.days === 1 ? ' day' : ' days') + ' of food, ' + eb.weighIns + (eb.weighIns === 1 ? ' weigh-in.' : ' weigh-ins.') }));
+    }
+    kids.push(h('p', { class: 'sub', text: 'Goal' }),
+      h('div', { class: 'seg', role: 'group', 'aria-label': 'Goal' }, [['cut', 'Lose fat'], ['maintain', 'Maintain'], ['bulk', 'Build muscle']].map(function (g) {
+        return h('button', { type: 'button', 'aria-pressed': String(ds.goal === g[0]), text: g[1], onclick: function () { setDiet({ goal: g[0], rate: null }); renderBody(); } });
+      })));
+    if (ds.goal !== 'maintain') {
+      var opts = ds.goal === 'cut' ? [0.25, 0.5, 0.75, 1] : [0.1, 0.25, 0.5], cur = Math.abs(goalRate(ds));
+      kids.push(h('p', { class: 'subnote', text: ds.goal === 'cut' ? 'Pace per week, as a share of your weight. 0.5–1% a week keeps most of your muscle.' : 'Pace per week, as a share of your weight. A slow gain keeps most of it muscle rather than fat.' }),
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Pace per week' }, opts.map(function (o) {
+          return h('button', { type: 'button', 'aria-pressed': String(Math.abs(cur - o) < 1e-6), text: rateLabel(o, w), onclick: function () { setDiet({ rate: o }); renderBody(); } });
+        })));
+    }
+    if (tgt) {
+      var ri = recentIntake(14), diff = ri.days >= 5 ? Math.round((tgt.kcal - ri.kcal) / 50) * 50 : null;
+      kids.push(h('div', { class: 'sugg' },
+        h('span', { class: 'tag ' + (tgt.onBreak ? 't-info' : 't-good'), text: tgt.onBreak ? 'Diet break' : 'Target' }),
+        h('span', null, 'Eat about ', h('b', { text: big(tgt.kcal) + ' kcal' }), ' a day' +
+          (diff == null ? '.' : Math.abs(diff) < 50 ? ', about what you have eaten in the last 2 weeks.' : ', ' + big(Math.abs(diff)) + (diff > 0 ? ' more' : ' less') + ' than in the last 2 weeks.'))));
+      if (tgt.onBreak) kids.push(h('p', { class: 'subnote' }, 'Diet break until ' + fmtLong(ds.breakUntil) + ': eat at maintenance, then the goal resumes. ',
+        h('button', { type: 'button', class: 'linkbtn', text: 'End diet break', onclick: function () { setDiet({ breakUntil: null }); renderBody(); } })));
+      else if (ds.goal !== 'maintain' || Math.abs(eb.weekly) > 0.15) {
+        var tol = Math.max(0.1, (w || 70) * 0.001), off = eb.weekly - tgt.kgWeek;
+        var note = Math.abs(off) <= tol ? 'Your weight is moving at the pace you planned.'
+          : ds.goal === 'cut' ? (off < 0 ? 'You are losing faster than planned, which risks muscle. The target above slows it down.' : 'You are losing slower than planned. The target above corrects it.')
+          : ds.goal === 'bulk' ? (off > 0 ? 'You are gaining faster than planned, so more of it is likely fat. The target above slows it down.' : 'You are gaining slower than planned. The target above corrects it.')
+          : (eb.weekly > 0 ? 'Your weight is creeping up.' : 'Your weight is drifting down.') + ' The target above holds it steady.';
+        kids.push(h('p', { class: 'subnote', text: 'Weight trend ' + signed(eb.weekly) + ' kg a week, planned ' + signed(tgt.kgWeek) + '. ' + note }));
+      }
+    }
+    kids.push(h('p', { class: 'sub', text: 'Protein' }),
+      h('div', { class: 'seg', role: 'group', 'aria-label': 'Protein per kilo' }, [1.6, 1.8, 2, 2.2].map(function (g) {
+        return h('button', { type: 'button', 'aria-pressed': String(Math.abs(ds.protein - g) < 1e-6), text: fmt(g) + ' g/kg', onclick: function () { setDiet({ protein: g }); renderBody(); } });
+      })),
+      h('p', { class: 'subnote', text: w ? 'Target ' + proteinTarget(w, ds) + ' g a day at your weight of ' + fmt(w) + ' kg. 1.6–2.2 g per kg is the range that best supports muscle growth; higher helps keep muscle while losing fat.'
+        : 'Add your weight on the Body page to get a protein target in grams.' }));
+    return h('section', { class: 'panel' }, kids);
+  }
+  function dietInsightsPanel(eb, pt) {
+    var lines = [], today = todayISO();
+    var wk = dietDocs().filter(function (d) { return d.date > addDays(today, -7) && d.p != null; });
+    if (pt && wk.length) lines.push(['Protein', 'Target reached on ' + wk.filter(function (d) { return d.p >= pt * 0.95; }).length + ' of ' + wk.length + ' logged days this week (average ' + Math.round(mean(wk.map(function (d) { return d.p; }))) + ' g).']);
+    var tr = trainingDates(), from = addDays(today, -27), recent = dietDocs().filter(function (d) { return d.date >= from; });
+    var on = recent.filter(function (d) { return tr[d.date]; }), off = recent.filter(function (d) { return !tr[d.date]; });
+    if (on.length >= 3 && off.length >= 3) {
+      var a = Math.round(mean(on.map(function (d) { return d.kcal; }))), b = Math.round(mean(off.map(function (d) { return d.kcal; })));
+      lines.push(['Training days', big(a) + ' kcal on training days, ' + big(b) + ' on rest days (last 4 weeks).' +
+        (a < b - 100 ? ' You eat less on the days you train; moving some food to those days can help your sessions.' : '')]);
+    }
+    if (eb.ok) {
+      var fed = [], low = [];
+      sessionDocs().forEach(function (s) {
+        if (!docKeys(s).length || s.date < addDays(today, -120)) return;
+        var prev = dietOn(addDays(s.date, -1));
+        if (!prev || !(prev.kcal > 0)) return;
+        if (prev.kcal >= eb.tdee - 150) fed.push(prCount(s)); else if (prev.kcal <= eb.tdee - 300) low.push(prCount(s));
+      });
+      if (fed.length >= 4 && low.length >= 4) {
+        var rf = mean(fed), rl = mean(low);
+        lines.push(['Records', fmt(rf) + ' records per session after a day at maintenance or above (' + fed.length + ' sessions), ' + fmt(rl) + ' after a day in a deficit (' + low.length + ').']);
+      }
+    }
+    var dd = currentDeficit();
+    if (dd && dd.deficit >= 300) lines.push(['Deficit', 'You have eaten about ' + big(dd.deficit) + ' kcal a day below maintenance over the last 2 weeks. If your lifts start dropping, the deload alert will suggest a diet break first.']);
+    if (!lines.length) return null;
+    return h('section', { class: 'panel' }, h('h2', { text: 'Diet and training' }),
+      h('div', { class: 'rows' }, lines.map(function (l) { return h('div', { class: 'row' }, h('span', { class: 'dt', text: l[0] }), h('span', { text: l[1] })); })));
+  }
+  function dietReviewPanel() {
+    var r = state.dreview;
+    return h('section', { class: 'panel', id: 'dietReview' },
+      h('h2', { text: 'Check the day\'s totals' }),
+      h('p', { class: 'subnote', text: 'Read from your screenshot' + (r.how === 'claude' ? ' by Claude' : '') + '. Compare with Macros and fix anything misread before saving.' + (r.dateFound ? '' : ' No date was found, so it is set to today.') }),
+      h('div', { class: 'bform' },
+        h('label', { class: 'lbl full', for: 'dr_date' }, 'Date', h('input', { type: 'date', id: 'dr_date', value: r.date, onchange: function (ev) { r.date = ev.target.value; } })),
+        DF.map(function (f) {
+          return h('label', { class: 'lbl', for: 'dr_' + f.k }, f.label + ' (' + f.unit + ')',
+            h('input', { type: 'text', inputmode: 'decimal', id: 'dr_' + f.k, autocomplete: 'off', value: r[f.k], oninput: function (ev) { r[f.k] = ev.target.value; } }));
+        })),
+      h('div', { class: 'acts' },
+        h('button', { type: 'button', class: 'btn primary', text: 'Save day', onclick: function () {
+          var err = saveDietDay(r, 'macros');
+          if (err) { state.dietMsg = err; renderBody(); return; }
+          state.dietMsg = 'Saved ' + fmtShort(r.date) + '.';
+          state.dreview = null;
+        } }),
+        h('button', { type: 'button', class: 'btn', text: 'Discard', onclick: function () { state.dreview = null; state.dietMsg = ''; renderBody(); } })));
+  }
+  function renderDiet(v) {
+    $('#ptitle').textContent = 'Diet';
+    $('#psub').textContent = 'Calories and macros, read together with your weight and training';
+    v.className = 'view tn5';
+    var ds = dietSettings(), w = latestWeight(), eb = energyBalance(), tgt = dietTarget(eb, ds, w), pt = proteinTarget(w, ds);
+    var docs = dietDocs(), kids = [bodySeg(), dietTodayPanel(dietOn(todayISO()), tgt, pt), dietGoalPanel(eb, ds, w, tgt), dietInsightsPanel(eb, pt)];
+    if (docs.length >= 2) {
+      var m = state.dmetric === 'p' ? DF[1] : DF[0];
+      var pts = docs.filter(function (d) { return d[m.k] != null; }).slice(-60).map(function (d) { return { date: d.date, t: parseISO(d.date).getTime(), v: d[m.k] }; });
+      state.charts.dchart = pts.length ? { pts: pts, label: m.label } : null;
+      kids.push(h('section', { class: 'panel' },
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Chart' }, [DF[0], DF[1]].map(function (x) {
+          return h('button', { type: 'button', 'aria-pressed': String(x.k === m.k), text: x.label, onclick: function () { state.dmetric = x.k; renderBody(); } });
+        })),
+        h('h2', { text: m.label + ' (' + m.unit + ')' }),
+        h('div', { class: 'chart', id: 'dchart' })));
+    } else state.charts.dchart = null;
+    if (state.dreview) kids.push(dietReviewPanel());
+    // add or edit a day
+    var f = state.dform || (state.dform = { date: todayISO() }), cur = dietOn(f.date);
+    function inp(x) {
+      var val = f[x.k] != null ? f[x.k] : (cur && cur[x.k] != null ? String(cur[x.k]) : '');
+      return h('label', { class: 'lbl', for: 'df_' + x.k }, x.label + ' (' + x.unit + ')',
+        h('input', { type: 'text', inputmode: 'decimal', id: 'df_' + x.k, autocomplete: 'off', value: val, oninput: function (ev) { f[x.k] = ev.target.value; } }));
+    }
+    var imp = [];
+    if (NATIVE && NATIVE.ocrPickImage) imp.push(h('button', { type: 'button', class: 'btn', text: 'Read Macros screenshot', onclick: pickDietImage }));
+    if (NATIVE && NATIVE.healthImportNutrition) imp.push(h('button', { type: 'button', class: 'btn', text: 'Import from Health Connect', onclick: function () { nutritionImport(true); } }));
+    kids.push(h('section', { class: 'panel' },
+      h('h2', { text: cur ? 'Edit ' + fmtShort(f.date) : 'Add a day' }),
+      h('p', { class: 'subnote', text: 'In Macros, take a screenshot of the day\'s summary (calories, protein, carbs and fat) and read it here, or type the totals.' +
+        (NATIVE && NATIVE.ocrPickImage ? ' The screenshot is read on your phone and not uploaded.' : '') }),
+      imp.length ? h('div', { class: 'acts' }, imp) : null,
+      !NATIVE && state.vision ? h('label', { class: 'lbl', for: 'dfile' }, 'Macros screenshot (Claude reads it)',
+        h('input', { type: 'file', id: 'dfile', accept: 'image/png,image/jpeg,image/webp', onchange: function (ev) { readDietWithClaude(ev.target.files && ev.target.files[0]); } })) : null,
+      h('div', { class: 'bform' },
+        h('label', { class: 'lbl full', for: 'ddate' }, 'Date',
+          h('input', { type: 'date', id: 'ddate', value: f.date, onchange: function (ev) { state.dform = { date: ev.target.value }; renderBody(); } })),
+        DF.map(inp)),
+      h('div', { class: 'acts' }, h('button', { type: 'button', class: 'btn primary', text: 'Save', onclick: function () {
+        state.dietMsg = '';
+        var r = { date: f.date };
+        DF.forEach(function (x) { r[x.k] = f[x.k] != null ? f[x.k] : (cur && cur[x.k] != null ? String(cur[x.k]) : ''); });
+        var err = saveDietDay(r, 'manual');
+        if (err) { f.msg = err; renderBody(); return; }
+        state.dform = { date: f.date, msg: 'Saved ' + fmtShort(f.date) + '.' };
+      } })),
+      h('p', { class: 'msg', 'aria-live': 'polite', text: state.dietMsg || f.msg || '' })));
+    if (docs.length) {
+      kids.push(h('section', { class: 'panel' },
+        h('div', { class: 'hhead' }, h('h2', { text: 'Days' }),
+          h('button', { type: 'button', class: 'btn small', text: 'Export CSV', onclick: function () { exportCsv('lift-log-diet-' + todayISO() + '.csv', dietCsvText(), $('#dmsg2')); } })),
+        h('p', { class: 'msg', id: 'dmsg2', 'aria-live': 'polite' }),
+        h('div', { class: 'blist' }, docs.slice().reverse().slice(0, state.dAll ? 400 : 14).map(function (d) {
+          var confirming = state.confirmBody === d.id;
+          var parts = [big(d.kcal) + ' kcal'].concat(['p', 'c', 'f'].filter(function (k) { return d[k] != null; }).map(function (k) { return 'PCF'.charAt(['p', 'c', 'f'].indexOf(k)) + ' ' + fmt(d[k]); }));
+          return h('div', { class: 'brow' },
+            h('span', { class: 'dt', text: fmtShort(d.date) }),
+            h('span', null, parts.join(' · '), h('span', { class: 'src', text: DIET_SRC[d.src] || '' })),
+            h('span', { class: 'acts' },
+              h('button', { type: 'button', class: 'btn small', text: 'Edit', onclick: function () {
+                state.dform = { date: d.date }; state.confirmBody = null; renderBody();
+                var el = document.getElementById('ddate'); if (el) el.scrollIntoView({ block: 'center' });
+              } }),
+              h('button', { type: 'button', class: 'btn small' + (confirming ? ' danger' : ''), 'aria-label': 'Delete ' + fmtShort(d.date), text: confirming ? 'Delete?' : '✕', onclick: function () {
+                if (confirming) { state.confirmBody = null; saveBodyDocs([d], true).then(renderBody); }
+                else { state.confirmBody = d.id; renderBody(); }
+              } })));
+        })),
+        docs.length > 14 ? h('button', { type: 'button', class: 'linkbtn', text: state.dAll ? 'Show fewer' : 'Show all ' + docs.length + ' days', onclick: function () { state.dAll = !state.dAll; renderBody(); } }) : null));
+    }
+    v.replaceChildren.apply(v, kids.filter(Boolean));
+    drawChart('dchart');
+  }
+  function bodySeg() {
+    return h('div', { class: 'seg bseg', role: 'group', 'aria-label': 'Section' }, [['body', 'Body'], ['diet', 'Diet']].map(function (x) {
+      return h('button', { type: 'button', 'aria-pressed': String((state.bview || 'body') === x[0]), text: x[1], onclick: function () {
+        state.bview = x[0]; state.confirmBody = null; render(); window.scrollTo(0, 0);
+      } });
+    }));
+  }
+
   /* ---------- history ---------- */
   function sessionsCsvText() {
     var rows = [['date', 'day', 'exercise', 'set', 'kg', 'reps', 'plan']];
@@ -2972,10 +3489,10 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
     }
     if (!o || o.format !== 'liftlog-backup' && !o.logs) { showDataMsg('That file is not a Lift Log backup.'); return; }
     var n = backupCounts(o);
-    if (!n.sessions && !n.body) { showDataMsg('That backup file is empty.'); return; }
+    if (!n.sessions && !n.body && !n.diet) { showDataMsg('That backup file is empty.'); return; }
     importBackup(o).then(function (r) {
-      state.dataMsg = 'Restored from backup: ' + r.sessions + (r.sessions === 1 ? ' session' : ' sessions') + ' and ' + r.body + (r.body === 1 ? ' body entry' : ' body entries') +
-        ' added or updated' + (r.sessions + r.body < n.sessions + n.body ? '. Entries you already had here were kept.' : '.');
+      state.dataMsg = 'Restored from backup: ' + r.sessions + (r.sessions === 1 ? ' session' : ' sessions') + ' and ' + r.body + (r.body === 1 ? ' body or diet entry' : ' body and diet entries') +
+        ' added or updated' + (r.sessions + r.body < n.sessions + n.body + n.diet ? '. Entries you already had here were kept.' : '.');
       if (!state.dirty && !state.busy) reloadDraft();
       render();
     });
@@ -3528,7 +4045,7 @@ body.docked { padding-bottom: calc(var(--navh) + 250px + env(safe-area-inset-bot
   $('#dockFinish').addEventListener('click', finishWorkout);
   window.addEventListener('pagehide', flush);
   var rz = null;
-  window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { drawChart('chart'); drawChart('bchart'); }, 150); });
+  window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { drawChart('chart'); drawChart('bchart'); drawChart('dchart'); }, 150); });
 
   reloadDraft();
   render();

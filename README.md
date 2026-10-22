@@ -35,6 +35,22 @@ debugging. From a computer with Android platform-tools:
 - Records, weight suggestions and progress belong to each exercise, so they carry over between plans.
   Deleting a plan you trained with only hides it; its sessions stay in History.
 
+## Diet
+Body > Diet keeps one line per day: calories, protein, carbs and fat. Food logging stays in Macros (or
+any other app); Lift Log only needs the day's totals, from:
+- a screenshot of the day's summary in Macros, read on the phone (ML Kit) and shown for review;
+- Health Connect nutrition (apps that write it there, such as Macros Premium, MyFitnessPal, Samsung Health);
+- typing the four numbers.
+
+Combined with the scale weight and the training log, it shows:
+- maintenance calories over the last 4 weeks (average intake adjusted by the weight trend, ~7,700 kcal
+  per kg), once there are 10+ logged days and 4+ weigh-ins over 10+ days;
+- a daily calorie target for the goal (lose fat, maintain, build muscle) at the chosen pace;
+- a protein target from body weight (1.6–2.2 g/kg) and how many days it was reached;
+- calories on training vs rest days, and records per session after eating at maintenance vs in a deficit;
+- diet in the weekly overview, and deload alerts that suggest a diet break first when lifts drop during
+  a big deficit.
+
 ## Body data
 The Body tab tracks weight, body fat and tape measurements. Data comes in three ways:
 - typed in by hand;

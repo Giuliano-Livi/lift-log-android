@@ -25,10 +25,12 @@ public class MainActivity extends Activity {
     private static final int REQ_OCR = 43;
     private static final int REQ_RESTORE = 44;
     private static final int REQ_BACKUP_TO = 45;
+    private static final int REQ_NUTRITION = 46;
 
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
     private int healthDays = 400;
+    private int nutritionDays = 120;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -154,6 +156,8 @@ public class MainActivity extends Activity {
         } else if (requestCode == REQ_HEALTH) {
             // Read again: if permission was granted the data comes back, otherwise the page shows why not.
             HealthBridge.read(this, healthDays, this::deliverHealth);
+        } else if (requestCode == REQ_NUTRITION) {
+            HealthBridge.readNutrition(this, nutritionDays, this::deliverNutrition);
         }
     }
 
@@ -161,6 +165,11 @@ public class MainActivity extends Activity {
     private void deliverHealth(String json) {
         runOnUiThread(() -> web.evaluateJavascript(
             "window.liftlogHealth && window.liftlogHealth(" + JSONObject.quote(json) + ")", null));
+    }
+
+    private void deliverNutrition(String json) {
+        runOnUiThread(() -> web.evaluateJavascript(
+            "window.liftlogNutrition && window.liftlogNutrition(" + JSONObject.quote(json) + ")", null));
     }
 
     /** Keep read and write access to a file you picked, across restarts. Returns true if writing is allowed. */
@@ -277,6 +286,32 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** Read nutrition (calories and macros) from Health Connect; with prompt=true, ask for permission if needed. */
+        @JavascriptInterface
+        public void healthImportNutrition(final int days, final boolean prompt) {
+            runOnUiThread(() -> {
+                String st = HealthBridge.status(MainActivity.this);
+                if (!"available".equals(st)) {
+                    deliverNutrition("{\"status\":\"" + st + "\"}");
+                    return;
+                }
+                nutritionDays = days;
+                HealthBridge.readNutrition(MainActivity.this, days, json -> {
+                    if (prompt && "no_permission".equals(status(json))) {
+                        runOnUiThread(() -> {
+                            try {
+                                startActivityForResult(HealthBridge.nutritionPermissionIntent(MainActivity.this), REQ_NUTRITION);
+                            } catch (ActivityNotFoundException e) {
+                                deliverNutrition("{\"status\":\"unavailable\"}");
+                            }
+                        });
+                    } else {
+                        deliverNutrition(json);
+                    }
+                });
+            });
+        }
+
         // ---- data store and backup file ----
 
         @JavascriptInterface
@@ -345,7 +380,7 @@ public class MainActivity extends Activity {
                 pick.addCategory(Intent.CATEGORY_OPENABLE);
                 pick.setType("image/*");
                 try {
-                    startActivityForResult(Intent.createChooser(pick, "Choose the report image"), REQ_OCR);
+                    startActivityForResult(Intent.createChooser(pick, "Choose an image"), REQ_OCR);
                 } catch (ActivityNotFoundException e) {
                     deliverOcr("{\"status\":\"error\",\"message\":\"no app to pick images\"}");
                 }
